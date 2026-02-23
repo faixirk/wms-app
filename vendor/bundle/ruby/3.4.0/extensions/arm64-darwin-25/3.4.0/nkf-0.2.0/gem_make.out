@@ -1,0 +1,18 @@
+current directory: /Volumes/Amaze/GithubProjects/WmsApp/vendor/bundle/ruby/3.4.0/gems/nkf-0.2.0/ext/nkf
+/opt/homebrew/opt/ruby/bin/ruby extconf.rb
+creating Makefile
+
+current directory: /Volumes/Amaze/GithubProjects/WmsApp/vendor/bundle/ruby/3.4.0/gems/nkf-0.2.0/ext/nkf
+make DESTDIR\= sitearchdir\=./.gem.20260223-83942-q81a66 sitelibdir\=./.gem.20260223-83942-q81a66 clean
+
+current directory: /Volumes/Amaze/GithubProjects/WmsApp/vendor/bundle/ruby/3.4.0/gems/nkf-0.2.0/ext/nkf
+make DESTDIR\= sitearchdir\=./.gem.20260223-83942-q81a66 sitelibdir\=./.gem.20260223-83942-q81a66
+compiling nkf.c
+linking shared-object nkf.bundle
+
+current directory: /Volumes/Amaze/GithubProjects/WmsApp/vendor/bundle/ruby/3.4.0/gems/nkf-0.2.0/ext/nkf
+make DESTDIR\= sitearchdir\=./.gem.20260223-83942-q81a66 sitelibdir\=./.gem.20260223-83942-q81a66 install
+/usr/bin/install -c -m 0755 nkf.bundle ./.gem.20260223-83942-q81a66
+
+current directory: /Volumes/Amaze/GithubProjects/WmsApp/vendor/bundle/ruby/3.4.0/gems/nkf-0.2.0/ext/nkf
+make DESTDIR\= sitearchdir\=./.gem.20260223-83942-q81a66 sitelibdir\=./.gem.20260223-83942-q81a66 clean
