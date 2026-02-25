@@ -2,7 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import axiosRetry from 'axios-retry';
 
 const apiClient = axios.create({
-  baseURL: 'https://avcons-zeit.de',
+  baseURL: 'https://api.wms365.ai',
   timeout: 20000,
   headers: {
     Accept: 'application/json',
@@ -53,7 +53,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response) {
-      console.log('Error Response:', error.response);
+      console.log('Error Response:', JSON.stringify(error.response, null, 2));
     } else if (error.request) {
       console.log(
         'No Response Received:',

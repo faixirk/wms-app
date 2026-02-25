@@ -1,0 +1,9 @@
+export const appLogo = require('../images/app_logo.png');
+export const onboard1 = require('../images/onboard1.png');
+export const onboard2 = require('../images/onboard2.png');
+export const onboard3 = require('../images/onboard3.png');
+export const enFlag = require('../images/en_flag.png');
+export const deFlag = require('../images/de_flag.png');
+export const forgetPassLogo = require('../images/forget_pass_logo.png');
+export const setPassLogo = require('../images/set_pass_logo.png');
+export const passChangedLogo = require('../images/pass_changed_logo.png');

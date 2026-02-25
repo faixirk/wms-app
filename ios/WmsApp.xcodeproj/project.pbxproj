@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		0C80B921A6F3F58F76C31292 /* libPods-WmsApp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-WmsApp.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		16AD290FEA264AF7B3282C02 /* Integral CF.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 22F05C4B71994C9EA51F5369 /* Integral CF.ttf */; };
+		36A9F64B269F44A783B9FB7B /* NunitoSans-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 170BC7CD5ADF4474B47D77EF /* NunitoSans-Variable.ttf */; };
+		4D72C50631E1480F962847D1 /* NunitoSans-Italic-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 502B0070DDF34A04A1ABB4FA /* NunitoSans-Italic-Variable.ttf */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		7CED4FFBD6D3126EC372F743 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
@@ -19,7 +22,10 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = WmsApp/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = WmsApp/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = WmsApp/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		170BC7CD5ADF4474B47D77EF /* NunitoSans-Variable.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "NunitoSans-Variable.ttf"; path = "../assets/fonts/NunitoSans-Variable.ttf"; sourceTree = "<group>"; };
+		22F05C4B71994C9EA51F5369 /* Integral CF.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "Integral CF.ttf"; path = "../assets/fonts/Integral CF.ttf"; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-WmsApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WmsApp.debug.xcconfig"; path = "Target Support Files/Pods-WmsApp/Pods-WmsApp.debug.xcconfig"; sourceTree = "<group>"; };
+		502B0070DDF34A04A1ABB4FA /* NunitoSans-Italic-Variable.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = "NunitoSans-Italic-Variable.ttf"; path = "../assets/fonts/NunitoSans-Italic-Variable.ttf"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-WmsApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-WmsApp.release.xcconfig"; path = "Target Support Files/Pods-WmsApp/Pods-WmsApp.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-WmsApp.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-WmsApp.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = WmsApp/AppDelegate.swift; sourceTree = "<group>"; };
@@ -75,6 +81,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				B1AA411D3B3F4A78B6CF3E5E /* Resources */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -87,6 +94,17 @@
 				13B07F961A680F5B00A75B9A /* WmsApp.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		B1AA411D3B3F4A78B6CF3E5E /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				22F05C4B71994C9EA51F5369 /* Integral CF.ttf */,
+				502B0070DDF34A04A1ABB4FA /* NunitoSans-Italic-Variable.ttf */,
+				170BC7CD5ADF4474B47D77EF /* NunitoSans-Variable.ttf */,
+			);
+			name = Resources;
+			path = "";
 			sourceTree = "<group>";
 		};
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
@@ -161,6 +179,9 @@
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				7CED4FFBD6D3126EC372F743 /* PrivacyInfo.xcprivacy in Resources */,
+				16AD290FEA264AF7B3282C02 /* Integral CF.ttf in Resources */,
+				4D72C50631E1480F962847D1 /* NunitoSans-Italic-Variable.ttf in Resources */,
+				36A9F64B269F44A783B9FB7B /* NunitoSans-Variable.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

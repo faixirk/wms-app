@@ -8,6 +8,7 @@ export interface RequestOptions {
   data?: unknown;
   params?: Record<string, unknown>;
   isMultipart?: boolean;
+  headers?: Record<string, string>;
 }
 
 const request = async <T = unknown>({
@@ -16,6 +17,7 @@ const request = async <T = unknown>({
   data = null,
   params = {},
   isMultipart = false,
+  headers: customHeaders,
 }: RequestOptions): Promise<AxiosResponse<T> | undefined> => {
   try {
     const isOnline = await checkNetwork();
@@ -24,7 +26,7 @@ const request = async <T = unknown>({
       console.log('You are offline. Please check your internet connection.');
       return;
     }
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { ...customHeaders };
     if (isMultipart) headers['Content-Type'] = 'multipart/form-data';
 
     const config = {
@@ -47,7 +49,7 @@ const request = async <T = unknown>({
       'Something went wrong! Please try again later.';
 
     // later add a toast message
-    console.log('errorMessage', errorMessage);
+    console.log('errorMessage', JSON.stringify(errorMessage, null, 2));
 
     throw error;
   }
