@@ -1,0 +1,1 @@
+/Volumes/Amaze/GithubProjects/wms-app/android/app/build/intermediates/cxx/Debug/27q3t1n4/obj/x86_64

@@ -6,6 +6,7 @@ import { useAppSelector } from '../hooks';
 
 const Root = () => {
   const token = useAppSelector((state) => state.auth.token);
+  console.log('token--->', token);
 
   return (
     <View style={[styles.container]}>

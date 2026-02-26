@@ -77,7 +77,7 @@ function getErrorMessage(
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async (
-    payload: { email?: string; password?: string; [key: string]: unknown },
+    payload: { email?: string; password?: string;[key: string]: unknown },
     { dispatch, rejectWithValue },
   ) => {
     try {
@@ -89,16 +89,20 @@ export const loginUser = createAsyncThunk(
       if (!response?.data) {
         return rejectWithValue('Invalid response');
       }
-      const { user, accessToken } = response.data as {
-        user?: AuthUser;
-        accessToken?: string;
-        [key: string]: unknown;
+      const { data, statusCode } = response.data as {
+        data?: {
+          user?: AuthUser;
+          access_token?: string;
+          refresh_token?: string;
+          [key: string]: unknown;
+        };
+        statusCode?: number;
       };
-      if (response.status === 200 && accessToken) {
+      if (statusCode === 200 && data?.access_token) {
         dispatch(
           setCredentials({
-            user: user ?? ({} as AuthUser),
-            token: accessToken,
+            user: data?.user ?? ({} as AuthUser),
+            token: data?.access_token,
           }),
         );
       }
