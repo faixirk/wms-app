@@ -3,31 +3,6 @@
   "reactNativePath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native",
   "reactNativeVersion": "0.84",
   "dependencies": {
-    "@react-native-async-storage/async-storage": {
-      "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-async-storage/async-storage",
-      "name": "@react-native-async-storage/async-storage",
-      "platforms": {
-        "ios": {
-          "podspecPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-async-storage/async-storage/AsyncStorage.podspec",
-          "version": "3.0.1",
-          "configurations": [],
-          "scriptPhases": []
-        },
-        "android": {
-          "sourceDir": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-async-storage/async-storage/android",
-          "packageImportPath": "import org.asyncstorage.AsyncStoragePackage;",
-          "packageInstance": "new AsyncStoragePackage()",
-          "buildTypes": [],
-          "libraryName": "AsyncStorageSpec",
-          "componentDescriptors": [],
-          "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/CMakeLists.txt",
-          "cxxModuleCMakeListsModuleName": null,
-          "cxxModuleCMakeListsPath": null,
-          "cxxModuleHeaderName": null,
-          "isPureCxxDependency": false
-        }
-      }
-    },
     "@react-native-community/datetimepicker": {
       "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-community/datetimepicker",
       "name": "@react-native-community/datetimepicker",
@@ -95,6 +70,31 @@
           "buildTypes": [],
           "componentDescriptors": [],
           "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-masked-view/masked-view/android/build/generated/source/codegen/jni/CMakeLists.txt",
+          "cxxModuleCMakeListsModuleName": null,
+          "cxxModuleCMakeListsPath": null,
+          "cxxModuleHeaderName": null,
+          "isPureCxxDependency": false
+        }
+      }
+    },
+    "react-native-document-picker": {
+      "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker",
+      "name": "react-native-document-picker",
+      "platforms": {
+        "ios": {
+          "podspecPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/react-native-document-picker.podspec",
+          "version": "9.3.1",
+          "configurations": [],
+          "scriptPhases": []
+        },
+        "android": {
+          "sourceDir": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android",
+          "packageImportPath": "import com.reactnativedocumentpicker.RNDocumentPickerPackage;",
+          "packageInstance": "new RNDocumentPickerPackage()",
+          "buildTypes": [],
+          "libraryName": "rndocumentpicker",
+          "componentDescriptors": [],
+          "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android/build/generated/source/codegen/jni/CMakeLists.txt",
           "cxxModuleCMakeListsModuleName": null,
           "cxxModuleCMakeListsPath": null,
           "cxxModuleHeaderName": null,
@@ -172,6 +172,30 @@
           "libraryName": "NitroModulesSpec",
           "componentDescriptors": [],
           "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-nitro-modules/android/build/generated/source/codegen/jni/CMakeLists.txt",
+          "cxxModuleCMakeListsModuleName": null,
+          "cxxModuleCMakeListsPath": null,
+          "cxxModuleHeaderName": null,
+          "isPureCxxDependency": false
+        }
+      }
+    },
+    "react-native-nitro-sound": {
+      "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-nitro-sound",
+      "name": "react-native-nitro-sound",
+      "platforms": {
+        "ios": {
+          "podspecPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-nitro-sound/NitroSound.podspec",
+          "version": "0.2.10",
+          "configurations": [],
+          "scriptPhases": []
+        },
+        "android": {
+          "sourceDir": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-nitro-sound/android",
+          "packageImportPath": "import com.margelo.nitro.sound.SoundPackage;",
+          "packageInstance": "new SoundPackage()",
+          "buildTypes": [],
+          "componentDescriptors": [],
+          "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-nitro-sound/android/build/generated/source/codegen/jni/CMakeLists.txt",
           "cxxModuleCMakeListsModuleName": null,
           "cxxModuleCMakeListsPath": null,
           "cxxModuleHeaderName": null,

@@ -25,24 +25,23 @@ axiosRetry(apiClient, {
 
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    if (config.url?.includes('/api/mechanic/')) {
-      try {
-        const { store } = require('../../redux/store') as { store: { getState: () => unknown } };
-        const state = store.getState() as { auth?: { user?: { token?: string; data?: { token?: string } } } };
-        const user = state?.auth?.user;
-        const token =
-          user?.token ??
-          user?.data?.token ??
-          (user?.data != null && typeof user.data === 'object' && user.data.token);
-
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        } else {
-          console.warn('No token found for mechanic API request:', config.url);
-        }
-      } catch (error) {
-        console.warn('Failed to get token from store:', error);
+    try {
+      const { store } = require('../../redux/store') as { store: { getState: () => unknown } };
+      const state = store.getState() as { auth?: { user?: { token?: string; data?: { token?: string } } } };
+      const user = state?.auth?.user;
+      const token =
+        user?.token ??
+        user?.data?.token ??
+        (user?.data != null && typeof user.data === 'object' && user.data.token);
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      } else {
+        // Only log warning if it's a known protected route to avoid log spam, 
+        // or just rely on the server returning 401.
+        // console.warn('No token found for protected API request:', config.url);
       }
+    } catch (error) {
+      console.warn('Failed to get token from store:', error);
     }
     return config;
   },

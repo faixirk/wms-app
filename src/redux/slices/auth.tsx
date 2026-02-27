@@ -16,6 +16,8 @@ export interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isFirstLaunch: boolean;
+  hasSelectedWorkspace: boolean;
+  selectedWorkspaceId: string | null;
   loading: boolean;
   error: string | null;
   forgotPasswordLoading: boolean;
@@ -33,6 +35,8 @@ const initialState: AuthState = {
   token: null,
   isAuthenticated: false,
   isFirstLaunch: true,
+  hasSelectedWorkspace: false,
+  selectedWorkspaceId: null,
   loading: false,
   error: null,
   forgotPasswordLoading: false,
@@ -190,7 +194,6 @@ export const resetPassword = createAsyncThunk(
         data: payload,
         headers: Object.keys(headers).length > 0 ? headers : undefined,
       });
-      console.log('response--->', JSON.stringify(response, null, 2));
       return response?.data ?? {};
     } catch (error: unknown) {
       const err = error as {
@@ -245,6 +248,15 @@ const authSlice = createSlice({
     },
     clearPasswordResetFlowToken: (state) => {
       state.passwordResetFlowToken = null;
+    },
+    setHasSelectedWorkspace: (
+      state,
+      action: PayloadAction<{ hasSelected: boolean; workspaceId?: string }>,
+    ) => {
+      state.hasSelectedWorkspace = action.payload.hasSelected;
+      if (action.payload.workspaceId) {
+        state.selectedWorkspaceId = action.payload.workspaceId;
+      }
     },
   },
   extraReducers: (builder) => {
@@ -318,6 +330,7 @@ export const {
   clearVerifyOtpError,
   clearResetPasswordError,
   clearPasswordResetFlowToken,
+  setHasSelectedWorkspace,
 } = authSlice.actions;
 
 export default authSlice.reducer;

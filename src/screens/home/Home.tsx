@@ -119,7 +119,7 @@ const Home = ({ navigation }: any) => {
                         style={styles.avatar}
                     />
                     <View style={styles.headerIcons}>
-                        <TouchableOpacity style={styles.iconCircle}>
+                        <TouchableOpacity style={styles.iconCircle} onPress={() => navigation?.navigate(SCREENS.CHAT_LIST)}>
                             <ChatIcon width={20} height={20} />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.iconCircle}>

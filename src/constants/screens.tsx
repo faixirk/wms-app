@@ -8,6 +8,9 @@ export const SCREENS = {
   MAIN_TABS: 'MainTabs',
   TODAYS_TASK: 'TodaysTask',
   TODAYS_MEETINGS: 'TodaysMeetings',
+  CHAT_LIST: 'ChatList',
+  CHAT_ROOM: 'ChatRoom',
+  WORKSPACE: 'Workspace',
 } as const;
 
 export type ScreenName = (typeof SCREENS)[keyof typeof SCREENS];

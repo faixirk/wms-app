@@ -3,15 +3,17 @@ import { persistStore, persistReducer } from 'redux-persist';
 import { combineReducers } from 'redux';
 import { reduxStorage } from './storage';
 import authReducer from './slices/auth';
+import chatReducer from './slices/chat';
 
 const persistConfig = {
   key: 'root',
   storage: reduxStorage,
-  whitelist: ['auth'],
+  whitelist: ['auth'], // Deliberately not persisting chat to avoid stale messages unless requested later
 };
 
 const rootReducer = combineReducers({
-  auth: authReducer
+  auth: authReducer,
+  chat: chatReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

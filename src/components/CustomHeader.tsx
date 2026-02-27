@@ -8,9 +8,10 @@ interface CustomHeaderProps {
     titlePrefix?: string; // e.g. "TODAY"
     titleSuffix?: string; // e.g. "TASK"
     onBackPress?: () => void;
+    rightComponent?: React.ReactNode;
 }
 
-const CustomHeader: React.FC<CustomHeaderProps> = ({ titlePrefix, titleSuffix, onBackPress }) => {
+const CustomHeader: React.FC<CustomHeaderProps> = ({ titlePrefix, titleSuffix, onBackPress, rightComponent }) => {
     return (
         <View style={styles.headerContainer}>
             <TouchableOpacity
@@ -28,8 +29,13 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({ titlePrefix, titleSuffix, o
                 </Text>
             </View>
 
-            {/* Invisible placeholder to ensure the title remains perfectly centered */}
-            <View style={styles.rightPlaceholder} />
+            {rightComponent ? (
+                <View style={styles.rightComponentContainer}>
+                    {rightComponent}
+                </View>
+            ) : (
+                <View style={styles.rightPlaceholder} />
+            )}
         </View>
     );
 };
@@ -73,6 +79,11 @@ const styles = StyleSheet.create({
     },
     rightPlaceholder: {
         width: 44,
+    },
+    rightComponentContainer: {
+        width: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });
 

@@ -6,4 +6,6 @@ export { default as Analytics } from './screens/analytics/Analytics';
 export { default as Settings } from './screens/settings/Settings';
 export { default as TodaysTask } from './screens/home/TodaysTask';
 export { default as TodaysMeetings } from './screens/home/TodaysMeetings';
-
+export { default as ChatList } from './screens/chat/ChatList';
+export { default as ChatRoom } from './screens/chat/ChatRoom';
+export { default as Workspace } from './screens/auth/Workspace';

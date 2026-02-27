@@ -17,4 +17,7 @@ export const todayMeetImg = require('../images/today_meet_img.png');
 export const cameraImg = require('../images/camera_img.png');
 export const startTimerIcon = require('../images/start.png');
 export const stopTimerIcon = require('../images/stop.png');
+export const chatScreenBg = require('../images/chat_screen_bg.png');
 export const deleteTimerIcon = require('../images/delete.png');
+export const addImg = require('../images/add_workspace.png');
+export const emptyChatImg = require('../images/empty_chat_img.png');
