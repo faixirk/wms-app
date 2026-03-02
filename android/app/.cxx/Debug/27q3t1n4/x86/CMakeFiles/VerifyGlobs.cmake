@@ -60,6 +60,54 @@ if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   file(TOUCH_NOCREATE "/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86/CMakeFiles/cmake.verify_globs")
 endif()
 
+# react_codegen_SRCS at /Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android/build/generated/source/codegen/jni/*.cpp")
+set(OLD_GLOB
+  "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android/build/generated/source/codegen/jni/ReactNativeBlobUtilSpec-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android/build/generated/source/codegen/jni/react/renderer/components/ReactNativeBlobUtilSpec/*.cpp")
+set(OLD_GLOB
+  "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android/build/generated/source/codegen/jni/react/renderer/components/ReactNativeBlobUtilSpec/ComponentDescriptors.cpp"
+  "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android/build/generated/source/codegen/jni/react/renderer/components/ReactNativeBlobUtilSpec/EventEmitters.cpp"
+  "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android/build/generated/source/codegen/jni/react/renderer/components/ReactNativeBlobUtilSpec/Props.cpp"
+  "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android/build/generated/source/codegen/jni/react/renderer/components/ReactNativeBlobUtilSpec/ShadowNodes.cpp"
+  "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android/build/generated/source/codegen/jni/react/renderer/components/ReactNativeBlobUtilSpec/States.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android/build/generated/source/codegen/jni/*.cpp")
+set(OLD_GLOB
+  "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android/build/generated/source/codegen/jni/rndocumentpicker-generated.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
+# react_codegen_SRCS at /Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android/build/generated/source/codegen/jni/react/renderer/components/rndocumentpicker/*.cpp")
+set(OLD_GLOB
+  "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android/build/generated/source/codegen/jni/react/renderer/components/rndocumentpicker/ComponentDescriptors.cpp"
+  "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android/build/generated/source/codegen/jni/react/renderer/components/rndocumentpicker/EventEmitters.cpp"
+  "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android/build/generated/source/codegen/jni/react/renderer/components/rndocumentpicker/Props.cpp"
+  "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android/build/generated/source/codegen/jni/react/renderer/components/rndocumentpicker/ShadowNodes.cpp"
+  "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android/build/generated/source/codegen/jni/react/renderer/components/rndocumentpicker/States.cpp"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86/CMakeFiles/cmake.verify_globs")
+endif()
+
 # react_codegen_SRCS at /Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-gesture-handler/android/build/generated/source/codegen/jni/CMakeLists.txt:9 (file)
 file(GLOB NEW_GLOB LIST_DIRECTORIES true "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-gesture-handler/android/build/generated/source/codegen/jni/*.cpp")
 set(OLD_GLOB

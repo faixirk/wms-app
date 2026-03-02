@@ -46,6 +46,8 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
   include("/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/RNDateTimePickerCGen_autolinked_build/cmake_install.cmake")
   include("/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/RNCNetInfoSpec_autolinked_build/cmake_install.cmake")
+  include("/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/ReactNativeBlobUtilSpec_autolinked_build/cmake_install.cmake")
+  include("/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/rndocumentpicker_autolinked_build/cmake_install.cmake")
   include("/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/rngesturehandler_codegen_autolinked_build/cmake_install.cmake")
   include("/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/NitroModulesSpec_autolinked_build/cmake_install.cmake")
   include("/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/rnreanimated_autolinked_build/cmake_install.cmake")

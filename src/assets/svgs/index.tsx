@@ -25,3 +25,7 @@ export { default as AttachmentIcon } from './attachment.svg';
 export { default as SendPaperplaneIcon } from './send_icon.svg';
 export { default as ArrowWhiteLeftIcon } from './arrow_white_left.svg';
 export { default as PlusIcon } from './plus_sign.svg';
+export { default as StopIcon } from './stop_icon.svg';
+export { default as PauseIcon } from './pause_icon.svg';
+export { default as CloseIcon } from './close_icon.svg';
+export { default as PhoneIcon } from './phone_icon.svg';

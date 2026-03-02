@@ -1,5 +1,9 @@
+import { Alert } from 'react-native';
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import axiosRetry from 'axios-retry';
+
+/** Prevents showing multiple 401 alerts when several requests fail at once. */
+let unauthenticatedAlertShown = false;
 
 const apiClient = axios.create({
   baseURL: 'https://api.wms365.ai',
@@ -51,6 +55,13 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
+    const status = error.response?.status;
+    const requestUrl = error.config?.url ?? error.config?.baseURL ?? '';
+    const path = typeof requestUrl === 'string' ? requestUrl : '';
+    const isAuthEndpoint = /\/auth\/?/.test(path);
+    const isSessionExpired =
+      status === 401 && !isAuthEndpoint;
+
     if (error.response) {
       console.log('Error Response:', JSON.stringify(error.response, null, 2));
     } else if (error.request) {
@@ -61,6 +72,48 @@ apiClient.interceptors.response.use(
     } else {
       console.log('Request Setup Error:', error.message);
     }
+
+    if (isSessionExpired && !unauthenticatedAlertShown) {
+      unauthenticatedAlertShown = true;
+      const message =
+        (error.response?.data as { message?: string | { message?: string } } | undefined)?.message;
+      const displayMessage =
+        typeof message === 'string'
+          ? message
+          : typeof message === 'object' && message?.message
+            ? message.message
+            : 'Your session has expired or you are not authorized.';
+      Alert.alert(
+        'Session Expired',
+        `${displayMessage} Please log out and log in again.`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              unauthenticatedAlertShown = false;
+            },
+          },
+          {
+            text: 'Log out',
+            style: 'destructive',
+            onPress: () => {
+              unauthenticatedAlertShown = false;
+              try {
+                const { store } = require('../../redux/store') as {
+                  store: { dispatch: (action: { type: string }) => void };
+                };
+                store.dispatch({ type: 'auth/logout' });
+              } catch (e) {
+                console.warn('Failed to dispatch logout on 401:', e);
+              }
+            },
+          },
+        ],
+        { cancelable: false },
+      );
+    }
+
     return Promise.reject(error);
   },
 );

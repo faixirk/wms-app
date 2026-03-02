@@ -53,6 +53,100 @@
         }
       }
     },
+    "@react-native-community/push-notification-ios": {
+      "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-community/push-notification-ios",
+      "name": "@react-native-community/push-notification-ios",
+      "platforms": {
+        "ios": {
+          "podspecPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-community/push-notification-ios/RNCPushNotificationIOS.podspec",
+          "version": "1.12.0",
+          "configurations": [],
+          "scriptPhases": []
+        },
+        "android": null
+      }
+    },
+    "@react-native-firebase/analytics": {
+      "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-firebase/analytics",
+      "name": "@react-native-firebase/analytics",
+      "platforms": {
+        "ios": {
+          "podspecPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-firebase/analytics/RNFBAnalytics.podspec",
+          "version": "23.8.6",
+          "configurations": [],
+          "scriptPhases": []
+        },
+        "android": {
+          "sourceDir": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-firebase/analytics/android",
+          "packageImportPath": "import io.invertase.firebase.analytics.ReactNativeFirebaseAnalyticsPackage;",
+          "packageInstance": "new ReactNativeFirebaseAnalyticsPackage()",
+          "buildTypes": [],
+          "componentDescriptors": [],
+          "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-firebase/analytics/android/build/generated/source/codegen/jni/CMakeLists.txt",
+          "cxxModuleCMakeListsModuleName": null,
+          "cxxModuleCMakeListsPath": null,
+          "cxxModuleHeaderName": null,
+          "isPureCxxDependency": false
+        }
+      }
+    },
+    "@react-native-firebase/app": {
+      "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-firebase/app",
+      "name": "@react-native-firebase/app",
+      "platforms": {
+        "ios": {
+          "podspecPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-firebase/app/RNFBApp.podspec",
+          "version": "23.8.6",
+          "configurations": [],
+          "scriptPhases": [
+            {
+              "name": "[RNFB] Core Configuration",
+              "path": "./ios_config.sh",
+              "execution_position": "after_compile",
+              "input_files": [
+                "$(BUILT_PRODUCTS_DIR)/$(INFOPLIST_PATH)"
+              ]
+            }
+          ]
+        },
+        "android": {
+          "sourceDir": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-firebase/app/android",
+          "packageImportPath": "import io.invertase.firebase.app.ReactNativeFirebaseAppPackage;",
+          "packageInstance": "new ReactNativeFirebaseAppPackage()",
+          "buildTypes": [],
+          "componentDescriptors": [],
+          "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-firebase/app/android/build/generated/source/codegen/jni/CMakeLists.txt",
+          "cxxModuleCMakeListsModuleName": null,
+          "cxxModuleCMakeListsPath": null,
+          "cxxModuleHeaderName": null,
+          "isPureCxxDependency": false
+        }
+      }
+    },
+    "@react-native-firebase/messaging": {
+      "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-firebase/messaging",
+      "name": "@react-native-firebase/messaging",
+      "platforms": {
+        "ios": {
+          "podspecPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-firebase/messaging/RNFBMessaging.podspec",
+          "version": "23.8.6",
+          "configurations": [],
+          "scriptPhases": []
+        },
+        "android": {
+          "sourceDir": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-firebase/messaging/android",
+          "packageImportPath": "import io.invertase.firebase.messaging.ReactNativeFirebaseMessagingPackage;",
+          "packageInstance": "new ReactNativeFirebaseMessagingPackage()",
+          "buildTypes": [],
+          "componentDescriptors": [],
+          "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-firebase/messaging/android/build/generated/source/codegen/jni/CMakeLists.txt",
+          "cxxModuleCMakeListsModuleName": null,
+          "cxxModuleCMakeListsPath": null,
+          "cxxModuleHeaderName": null,
+          "isPureCxxDependency": false
+        }
+      }
+    },
     "@react-native-masked-view/masked-view": {
       "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-masked-view/masked-view",
       "name": "@react-native-masked-view/masked-view",
@@ -70,6 +164,55 @@
           "buildTypes": [],
           "componentDescriptors": [],
           "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-masked-view/masked-view/android/build/generated/source/codegen/jni/CMakeLists.txt",
+          "cxxModuleCMakeListsModuleName": null,
+          "cxxModuleCMakeListsPath": null,
+          "cxxModuleHeaderName": null,
+          "isPureCxxDependency": false
+        }
+      }
+    },
+    "react-native-blob-util": {
+      "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util",
+      "name": "react-native-blob-util",
+      "platforms": {
+        "ios": {
+          "podspecPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/react-native-blob-util.podspec",
+          "version": "0.24.7",
+          "configurations": [],
+          "scriptPhases": []
+        },
+        "android": {
+          "sourceDir": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android",
+          "packageImportPath": "import com.ReactNativeBlobUtil.ReactNativeBlobUtilPackage;",
+          "packageInstance": "new ReactNativeBlobUtilPackage()",
+          "buildTypes": [],
+          "libraryName": "ReactNativeBlobUtilSpec",
+          "componentDescriptors": [],
+          "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android/build/generated/source/codegen/jni/CMakeLists.txt",
+          "cxxModuleCMakeListsModuleName": null,
+          "cxxModuleCMakeListsPath": null,
+          "cxxModuleHeaderName": null,
+          "isPureCxxDependency": false
+        }
+      }
+    },
+    "react-native-device-info": {
+      "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-device-info",
+      "name": "react-native-device-info",
+      "platforms": {
+        "ios": {
+          "podspecPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-device-info/RNDeviceInfo.podspec",
+          "version": "15.0.2",
+          "configurations": [],
+          "scriptPhases": []
+        },
+        "android": {
+          "sourceDir": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-device-info/android",
+          "packageImportPath": "import com.learnium.RNDeviceInfo.RNDeviceInfo;",
+          "packageInstance": "new RNDeviceInfo()",
+          "buildTypes": [],
+          "componentDescriptors": [],
+          "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-device-info/android/build/generated/source/codegen/jni/CMakeLists.txt",
           "cxxModuleCMakeListsModuleName": null,
           "cxxModuleCMakeListsPath": null,
           "cxxModuleHeaderName": null,
@@ -196,6 +339,25 @@
           "buildTypes": [],
           "componentDescriptors": [],
           "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-nitro-sound/android/build/generated/source/codegen/jni/CMakeLists.txt",
+          "cxxModuleCMakeListsModuleName": null,
+          "cxxModuleCMakeListsPath": null,
+          "cxxModuleHeaderName": null,
+          "isPureCxxDependency": false
+        }
+      }
+    },
+    "react-native-push-notification": {
+      "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-push-notification",
+      "name": "react-native-push-notification",
+      "platforms": {
+        "ios": null,
+        "android": {
+          "sourceDir": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-push-notification/android",
+          "packageImportPath": "import com.dieam.reactnativepushnotification.ReactNativePushNotificationPackage;",
+          "packageInstance": "new ReactNativePushNotificationPackage()",
+          "buildTypes": [],
+          "componentDescriptors": [],
+          "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-push-notification/android/build/generated/source/codegen/jni/CMakeLists.txt",
           "cxxModuleCMakeListsModuleName": null,
           "cxxModuleCMakeListsPath": null,
           "cxxModuleHeaderName": null,
@@ -368,6 +530,30 @@
           "libraryName": "RNVectorIconsSpec",
           "componentDescriptors": [],
           "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-vector-icons/android/build/generated/source/codegen/jni/CMakeLists.txt",
+          "cxxModuleCMakeListsModuleName": null,
+          "cxxModuleCMakeListsPath": null,
+          "cxxModuleHeaderName": null,
+          "isPureCxxDependency": false
+        }
+      }
+    },
+    "react-native-webrtc": {
+      "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-webrtc",
+      "name": "react-native-webrtc",
+      "platforms": {
+        "ios": {
+          "podspecPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-webrtc/react-native-webrtc.podspec",
+          "version": "124.0.7",
+          "configurations": [],
+          "scriptPhases": []
+        },
+        "android": {
+          "sourceDir": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-webrtc/android",
+          "packageImportPath": "import com.oney.WebRTCModule.WebRTCModulePackage;",
+          "packageInstance": "new WebRTCModulePackage()",
+          "buildTypes": [],
+          "componentDescriptors": [],
+          "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-webrtc/android/build/generated/source/codegen/jni/CMakeLists.txt",
           "cxxModuleCMakeListsModuleName": null,
           "cxxModuleCMakeListsPath": null,
           "cxxModuleHeaderName": null,

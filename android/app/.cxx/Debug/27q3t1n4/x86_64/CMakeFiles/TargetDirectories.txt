@@ -7,6 +7,12 @@
 /Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/RNCNetInfoSpec_autolinked_build/CMakeFiles/react_codegen_RNCNetInfoSpec.dir
 /Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/RNCNetInfoSpec_autolinked_build/CMakeFiles/edit_cache.dir
 /Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/RNCNetInfoSpec_autolinked_build/CMakeFiles/rebuild_cache.dir
+/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/ReactNativeBlobUtilSpec_autolinked_build/CMakeFiles/react_codegen_ReactNativeBlobUtilSpec.dir
+/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/ReactNativeBlobUtilSpec_autolinked_build/CMakeFiles/edit_cache.dir
+/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/ReactNativeBlobUtilSpec_autolinked_build/CMakeFiles/rebuild_cache.dir
+/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/rndocumentpicker_autolinked_build/CMakeFiles/react_codegen_rndocumentpicker.dir
+/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/rndocumentpicker_autolinked_build/CMakeFiles/edit_cache.dir
+/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/rndocumentpicker_autolinked_build/CMakeFiles/rebuild_cache.dir
 /Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/rngesturehandler_codegen_autolinked_build/CMakeFiles/react_codegen_rngesturehandler_codegen.dir
 /Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/rngesturehandler_codegen_autolinked_build/CMakeFiles/edit_cache.dir
 /Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/Debug/27q3t1n4/x86_64/rngesturehandler_codegen_autolinked_build/CMakeFiles/rebuild_cache.dir

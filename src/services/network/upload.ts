@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import request from './request';
 import ENDPOINTS from '../../constants/endpoints';
 
@@ -8,10 +10,15 @@ export interface UploadedFileResponse {
     filename?: string;
 }
 
+/** On Android, content:// URIs must be read via native modules; standard fetch() fails. */
+const useBlobUtilUpload = (fileUri: string): boolean =>
+    Platform.OS === 'android' || fileUri.startsWith('content://');
+
 /**
  * Reusable utility to upload any file directly to S3 via Presigned URL
  * Step 1: Request Presigned URL from backend
  * Step 2: PUT raw file/blob directly to AWS S3
+ * On Android (and for content:// URIs), uses react-native-blob-util to avoid "Network request failed".
  */
 export const uploadFile = async (
     fileUri: string,
@@ -43,21 +50,27 @@ export const uploadFile = async (
         const { url: uploadUrl, publicUrl, filename: s3Key } = presignedData;
         console.log(`[Upload] Retrieved Presigned URL successfully`, publicUrl);
 
-        // React Native specific flow to get binary data from local URI
-        // Using standard fetch for PUTting to S3 to bypass interceptor auth headers
+        const mimeType = fileType || 'application/octet-stream';
 
-        let fileBody: any;
+        if (useBlobUtilUpload(fileUri)) {
+            // Android / content://: standard fetch(fileUri) fails; use native blob util.
+            const res = await ReactNativeBlobUtil.fetch('PUT', uploadUrl, {
+                'Content-Type': mimeType,
+            }, ReactNativeBlobUtil.wrap(fileUri));
+            const status = (res as any).respInfo?.status ?? (res as any).info?.()?.status ?? 0;
+            if (status >= 200 && status < 300) {
+                console.log(`[Upload] ✅ Successfully uploaded to S3:`, publicUrl);
+                return { success: true, publicUrl, filename: s3Key };
+            }
+            throw new Error(`S3 Upload failed: ${status} ${(res as any).respInfo?.statusText ?? ''}`);
+        }
 
-        // Convert URI to Blob for fetch API
+        // iOS / file://: use standard fetch (reads local file and PUTs to S3).
         const response = await fetch(fileUri);
-        fileBody = await response.blob();
-
-        // Step 2: Upload directly to S3 URL
+        const fileBody = await response.blob();
         const uploadRes = await fetch(uploadUrl, {
             method: 'PUT',
-            headers: {
-                'Content-Type': fileType, // MUST exactly match what was sent in step 1
-            },
+            headers: { 'Content-Type': mimeType },
             body: fileBody,
         });
 
@@ -68,9 +81,8 @@ export const uploadFile = async (
                 publicUrl: publicUrl,
                 filename: s3Key,
             };
-        } else {
-            throw new Error(`S3 Upload failed: ${uploadRes.status} ${uploadRes.statusText}`);
         }
+        throw new Error(`S3 Upload failed: ${uploadRes.status} ${uploadRes.statusText}`);
     } catch (error) {
         console.error('[Upload API] Error uploading file:', error);
         return { success: false };

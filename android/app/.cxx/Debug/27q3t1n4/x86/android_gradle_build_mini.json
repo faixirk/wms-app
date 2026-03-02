@@ -2,6 +2,8 @@
   "buildFiles": [
     "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-community/datetimepicker/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-community/netinfo/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-gesture-handler/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-nitro-modules/android/build/generated/source/codegen/jni/CMakeLists.txt",
     "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-reanimated/android/build/generated/source/codegen/jni/CMakeLists.txt",
@@ -32,35 +34,20 @@
       "abi": "x86",
       "runtimeFiles": []
     },
-    "react_codegen_rnreanimated::@8afabad14bfffa3f8b9a": {
-      "artifactName": "react_codegen_rnreanimated",
-      "abi": "x86",
-      "runtimeFiles": []
-    },
     "react_codegen_safeareacontext::@7984cd80db47aa7b952a": {
       "artifactName": "react_codegen_safeareacontext",
       "abi": "x86",
       "output": "/Volumes/Amaze/GithubProjects/wms-app/android/app/build/intermediates/cxx/Debug/27q3t1n4/obj/x86/libreact_codegen_safeareacontext.so",
       "runtimeFiles": [
-        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/e2575a32666c9d6ebbf516280d8f962f/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so",
-        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/6674e6cc609acce3f4c1e3e62b9ca47c/transformed/react-android-0.84.0-debug/prefab/modules/jsi/libs/android.x86/libjsi.so",
-        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/6674e6cc609acce3f4c1e3e62b9ca47c/transformed/react-android-0.84.0-debug/prefab/modules/reactnative/libs/android.x86/libreactnative.so"
+        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/70039f1a0293b9b2989e59e5e4c81c72/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so",
+        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/78106f99602fa73998c7f638b437c744/transformed/react-android-0.84.0-debug/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/78106f99602fa73998c7f638b437c744/transformed/react-android-0.84.0-debug/prefab/modules/reactnative/libs/android.x86/libreactnative.so"
       ]
     },
     "react_codegen_rngesturehandler_codegen::@39f233abcd2c728bc6ec": {
       "artifactName": "react_codegen_rngesturehandler_codegen",
       "abi": "x86",
       "runtimeFiles": []
-    },
-    "react_codegen_rnscreens::@25bcbd507e98d3a854ad": {
-      "artifactName": "react_codegen_rnscreens",
-      "abi": "x86",
-      "output": "/Volumes/Amaze/GithubProjects/wms-app/android/app/build/intermediates/cxx/Debug/27q3t1n4/obj/x86/libreact_codegen_rnscreens.so",
-      "runtimeFiles": [
-        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/6674e6cc609acce3f4c1e3e62b9ca47c/transformed/react-android-0.84.0-debug/prefab/modules/reactnative/libs/android.x86/libreactnative.so",
-        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/6674e6cc609acce3f4c1e3e62b9ca47c/transformed/react-android-0.84.0-debug/prefab/modules/jsi/libs/android.x86/libjsi.so",
-        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/e2575a32666c9d6ebbf516280d8f962f/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so"
-      ]
     },
     "react_codegen_RNDateTimePickerCGen::@59b70ddc31ba2f8ef1d2": {
       "artifactName": "react_codegen_RNDateTimePickerCGen",
@@ -75,13 +62,18 @@
         "/Volumes/Amaze/GithubProjects/wms-app/android/app/build/intermediates/cxx/Debug/27q3t1n4/obj/x86/libreact_codegen_safeareacontext.so",
         "/Volumes/Amaze/GithubProjects/wms-app/android/app/build/intermediates/cxx/Debug/27q3t1n4/obj/x86/libreact_codegen_rnscreens.so",
         "/Volumes/Amaze/GithubProjects/wms-app/android/app/build/intermediates/cxx/Debug/27q3t1n4/obj/x86/libreact_codegen_rnsvg.so",
-        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/e2575a32666c9d6ebbf516280d8f962f/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so",
-        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/6674e6cc609acce3f4c1e3e62b9ca47c/transformed/react-android-0.84.0-debug/prefab/modules/jsi/libs/android.x86/libjsi.so",
-        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/6674e6cc609acce3f4c1e3e62b9ca47c/transformed/react-android-0.84.0-debug/prefab/modules/reactnative/libs/android.x86/libreactnative.so"
+        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/70039f1a0293b9b2989e59e5e4c81c72/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so",
+        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/78106f99602fa73998c7f638b437c744/transformed/react-android-0.84.0-debug/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/78106f99602fa73998c7f638b437c744/transformed/react-android-0.84.0-debug/prefab/modules/reactnative/libs/android.x86/libreactnative.so"
       ]
     },
-    "react_codegen_NitroModulesSpec::@472a82f9c57d3d3b8644": {
-      "artifactName": "react_codegen_NitroModulesSpec",
+    "react_codegen_ReactNativeBlobUtilSpec::@7d3cc6108106e04bb830": {
+      "artifactName": "react_codegen_ReactNativeBlobUtilSpec",
+      "abi": "x86",
+      "runtimeFiles": []
+    },
+    "react_codegen_rndocumentpicker::@1e246c1f1267e461f98b": {
+      "artifactName": "react_codegen_rndocumentpicker",
       "abi": "x86",
       "runtimeFiles": []
     },
@@ -90,9 +82,9 @@
       "abi": "x86",
       "output": "/Volumes/Amaze/GithubProjects/wms-app/android/app/build/intermediates/cxx/Debug/27q3t1n4/obj/x86/libreact_codegen_rnsvg.so",
       "runtimeFiles": [
-        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/6674e6cc609acce3f4c1e3e62b9ca47c/transformed/react-android-0.84.0-debug/prefab/modules/reactnative/libs/android.x86/libreactnative.so",
-        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/6674e6cc609acce3f4c1e3e62b9ca47c/transformed/react-android-0.84.0-debug/prefab/modules/jsi/libs/android.x86/libjsi.so",
-        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/e2575a32666c9d6ebbf516280d8f962f/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so"
+        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/78106f99602fa73998c7f638b437c744/transformed/react-android-0.84.0-debug/prefab/modules/reactnative/libs/android.x86/libreactnative.so",
+        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/78106f99602fa73998c7f638b437c744/transformed/react-android-0.84.0-debug/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/70039f1a0293b9b2989e59e5e4c81c72/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so"
       ]
     },
     "react_codegen_RNCNetInfoSpec::@c36c96bfd5b5770618a5": {
@@ -102,6 +94,26 @@
     },
     "react_codegen_rnworklets::@68f58d84d4754f193387": {
       "artifactName": "react_codegen_rnworklets",
+      "abi": "x86",
+      "runtimeFiles": []
+    },
+    "react_codegen_rnreanimated::@8afabad14bfffa3f8b9a": {
+      "artifactName": "react_codegen_rnreanimated",
+      "abi": "x86",
+      "runtimeFiles": []
+    },
+    "react_codegen_rnscreens::@25bcbd507e98d3a854ad": {
+      "artifactName": "react_codegen_rnscreens",
+      "abi": "x86",
+      "output": "/Volumes/Amaze/GithubProjects/wms-app/android/app/build/intermediates/cxx/Debug/27q3t1n4/obj/x86/libreact_codegen_rnscreens.so",
+      "runtimeFiles": [
+        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/78106f99602fa73998c7f638b437c744/transformed/react-android-0.84.0-debug/prefab/modules/reactnative/libs/android.x86/libreactnative.so",
+        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/78106f99602fa73998c7f638b437c744/transformed/react-android-0.84.0-debug/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/Users/nextbyte/.gradle/caches/9.0.0/transforms/70039f1a0293b9b2989e59e5e4c81c72/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so"
+      ]
+    },
+    "react_codegen_NitroModulesSpec::@472a82f9c57d3d3b8644": {
+      "artifactName": "react_codegen_NitroModulesSpec",
       "abi": "x86",
       "runtimeFiles": []
     }

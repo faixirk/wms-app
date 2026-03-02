@@ -45,6 +45,8 @@ import {
 import SetNewPasswordModal from '../../components/SetNewPasswordModal';
 import PasswordChangedModal from '../../components/PasswordChangedModal';
 import LanguageSheet, { type LanguageCode } from '../../components/LanguageSheet';
+import DeviceInfo from 'react-native-device-info';
+import { getFcmToken } from '../../services/firebase/fcm';
 
 const SignIn = () => {
   const insets = useSafeAreaInsets();
@@ -79,7 +81,7 @@ const SignIn = () => {
   const hasEmailError = Boolean(emailError);
   const hasPasswordError = Boolean(passwordError);
 
-  const onSignIn = () => {
+  const onSignIn = async () => {
     let hasError = false;
     if (!email.trim()) {
       setEmailError("Email doesn't registered to any account");
@@ -94,7 +96,18 @@ const SignIn = () => {
       setPasswordError('');
     }
     if (hasError) return;
-    dispatch(loginUser({ email: email.trim(), password }));
+
+    // Fetch device and token details
+    const fcmToken = await getFcmToken();
+    const deviceId = await DeviceInfo.getUniqueId();
+
+    dispatch(loginUser({
+      email: email.trim(),
+      password,
+      fcmToken,
+      deviceId,
+      platform: Platform.OS
+    }));
   };
 
   const onForgotPassword = () => {
@@ -112,7 +125,7 @@ const SignIn = () => {
         setOtpVisible(true);
         dispatch(clearVerifyOtpError());
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const onOtpSubmit = (code: string) => {
@@ -123,7 +136,7 @@ const SignIn = () => {
         dispatch(clearResetPasswordError());
         setSetNewPasswordVisible(true);
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const onSetNewPasswordSubmit = (newPassword: string, confirmPassword: string) => {
@@ -133,7 +146,7 @@ const SignIn = () => {
         setSetNewPasswordVisible(false);
         setPasswordChangedVisible(true);
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const onOtpResend = () => {

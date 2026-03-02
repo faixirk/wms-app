@@ -76,31 +76,41 @@ const ChatList = ({ navigation }: any) => {
                 fetchedMembers = data.items;
             }
             setMembers(fetchedMembers);
-        } catch (error) {
-            console.error('Failed to fetch members', error);
+        } catch (err: unknown) {
+            const msg =
+                err != null && typeof err === 'object' && 'message' in err
+                    ? String((err as { message: unknown }).message)
+                    : 'Failed to fetch members';
+            console.error('Failed to fetch members', msg);
         } finally {
             setLoadingMembers(false);
         }
     };
 
     const initiateChatWithMember = async (member: any) => {
+        const otherUserId = member.userId || member.user?.id || member.id;
+        if (!otherUserId) return;
         setIsMembersModalVisible(false);
         try {
             const payload = {
                 workspaceId: selectedWorkspaceId,
                 type: 'DIRECT',
-                otherUserId: member.userId || member.user?.id || member.id,
+                otherUserId,
             };
             const res = await request<any>({
                 url: ENDPOINTS.CHAT_CREATE,
                 method: 'POST',
                 data: payload
             });
+            // Support multiple response shapes: res.data.id, res.data.data.id, res.data.chat.id
             const chatData = res?.data;
-            if (chatData?.id) {
-                navigation.navigate('ChatRoom', { chatId: chatData.id });
-                // Optimistically fetch list to ensure promptness
+            const chatId =
+                chatData?.id ||
+                chatData?.data?.id ||
+                chatData?.chat?.id;
+            if (chatId) {
                 dispatch(fetchChatList(selectedWorkspaceId as string));
+                navigation.navigate('ChatRoom', { chatId });
             }
         } catch (error) {
             console.error('Failed to create chat', error);
@@ -116,7 +126,9 @@ const ChatList = ({ navigation }: any) => {
         const otherParticipant = item.participants?.find((p: any) => p.id !== currentUserId) || item.participants?.[0];
 
         const chatName = item.title || item.name || otherParticipant?.username || otherParticipant?.name || 'Unknown Chat';
-        const chatAvatar = item.avatar || otherParticipant?.avatar || 'https://i.pravatar.cc/150';
+        const chatAvatarUri = item.avatar || otherParticipant?.avatar;
+        const showAvatarImage = !!chatAvatarUri;
+        const avatarInitial = (chatName || '?').trim().charAt(0).toUpperCase() || '?';
 
         let messagePreview: string = 'No messages yet';
         let timePreview = '';
@@ -143,7 +155,13 @@ const ChatList = ({ navigation }: any) => {
                 onPress={() => navigation.navigate('ChatRoom', { chatId: item.id })}
             >
                 <View style={styles.avatarContainer}>
-                    <Image source={{ uri: chatAvatar }} style={styles.avatar} />
+                    {showAvatarImage ? (
+                        <Image source={{ uri: chatAvatarUri }} style={styles.avatar} />
+                    ) : (
+                        <View style={styles.avatarPlaceholder}>
+                            <Text style={styles.avatarPlaceholderText}>{avatarInitial}</Text>
+                        </View>
+                    )}
                     {hasAttachment && (
                         <View style={styles.attachmentBadge}>
                             <Text style={styles.attachmentText}>📎</Text>
@@ -173,7 +191,9 @@ const ChatList = ({ navigation }: any) => {
     const renderMemberItem = ({ item }: { item: any }) => {
         const memberUser = item.user || {};
         const memberName = memberUser.username || memberUser.name || item.name || `${item.firstName} ${item.lastName}` || 'Unknown User';
-        const memberAvatar = memberUser.avatar || item.avatar || 'https://i.pravatar.cc/150';
+        const memberAvatarUri = memberUser.avatar || item.avatar;
+        const showMemberAvatar = !!memberAvatarUri;
+        const memberInitial = (memberName || '?').trim().charAt(0).toUpperCase() || '?';
 
         return (
             <TouchableOpacity
@@ -181,7 +201,13 @@ const ChatList = ({ navigation }: any) => {
                 onPress={() => initiateChatWithMember(item)}
                 activeOpacity={0.7}
             >
-                <Image source={{ uri: memberAvatar }} style={styles.memberAvatar} />
+                {showMemberAvatar ? (
+                    <Image source={{ uri: memberAvatarUri }} style={styles.memberAvatar} />
+                ) : (
+                    <View style={styles.memberAvatarPlaceholder}>
+                        <Text style={styles.memberAvatarPlaceholderText}>{memberInitial}</Text>
+                    </View>
+                )}
                 <Text style={styles.memberName}>{memberName}</Text>
             </TouchableOpacity>
         );
@@ -343,6 +369,20 @@ const styles = StyleSheet.create({
         height: 44,
         borderRadius: 22,
     },
+    avatarPlaceholder: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#E6E6FA',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarPlaceholderText: {
+        fontFamily: FONT_BODY,
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#6938EF',
+    },
     attachmentBadge: {
         position: 'absolute',
         bottom: -2,
@@ -489,6 +529,21 @@ const styles = StyleSheet.create({
         height: 44,
         borderRadius: 22,
         marginRight: 16,
+    },
+    memberAvatarPlaceholder: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        marginRight: 16,
+        backgroundColor: '#E6E6FA',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    memberAvatarPlaceholderText: {
+        fontFamily: FONT_BODY,
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#6938EF',
     },
     memberName: {
         fontFamily: FONT_BODY,

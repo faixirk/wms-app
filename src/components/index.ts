@@ -23,3 +23,4 @@ export { CutoutCard } from './CutoutCard';
 export { default as FocusCard } from './FocusCard';
 export type { FocusCardProps } from './FocusCard';
 export { default as CustomHeader } from './CustomHeader';
+export { default as CallOverlay } from './CallOverlay';

@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     View, Text, StyleSheet, ImageBackground, Image, TouchableOpacity, TextInput,
-    FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, PermissionsAndroid
+    FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, PermissionsAndroid,
+    Modal, Linking, Dimensions, Animated
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import DocumentPicker from 'react-native-document-picker';
-import { ArrowWhiteLeftIcon, CalenderBlueIcon, ChatVideoCamIcon, SendPaperplaneIcon, MicIcon, AttachmentIcon, PlayButtonIcon } from '../../assets/svgs';
+import { ArrowWhiteLeftIcon, CalenderBlueIcon, ChatVideoCamIcon, SendPaperplaneIcon, MicIcon, AttachmentIcon, PlayButtonIcon, StopIcon, PauseIcon, CloseIcon, PhoneIcon } from '../../assets/svgs';
 import { chatScreenBg } from '../../assets/images';
 import { COLORS } from '../../constants/colors';
 import { FONT_HEADING, FONT_BODY } from '../../constants/fonts';
@@ -15,22 +16,99 @@ import { fetchChatList, fetchChatMessages, ApiMessage, addMessageToRoom } from '
 import { socketService } from '../../services/network/socket';
 import { uploadFile } from '../../services/network/upload';
 import { useSound } from 'react-native-nitro-sound';
-// @ts-ignore
-import Icon from 'react-native-vector-icons/Ionicons';
+import ReactNativeBlobUtil from 'react-native-blob-util';
+import { useCall } from '../../context/CallContext';
 
-const AudioMessagePlayer = ({ url, isSent, duration: initialDuration = 0 }: { url: string; isSent: boolean; duration?: number }) => {
-    const { startPlayer, pausePlayer, resumePlayer, state } = useSound({
-        subscriptionDuration: 0.1, // 100ms updates for smooth waveform
+const WAVEFORM_BAR_COUNT = 15;
+
+/** Shared ref: which audio URL is currently playing (Sound is a singleton). Only that instance should show progress. */
+let currentPlayingAudioUrl: string | null = null;
+
+/** Deterministic bar heights from url so waveform is stable and does not change on list re-render. */
+function getStableWaveformHeights(seedUrl: string): number[] {
+    let h = 0;
+    const s = seedUrl.length;
+    return Array.from({ length: WAVEFORM_BAR_COUNT }, (_, i) => {
+        h = (h + s + (i * 7) + 1) % 100;
+        return Math.max(8, (h % 17) + 8);
     });
+}
+
+/** Format milliseconds as actual duration: "0:03" for 3s, "1:23" for 83s (minutes:seconds). */
+function formatDurationMs(ms: number): string {
+    const totalSecs = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+/** Native may send seconds (e.g. 3.96) or ms (3960). Normalize to ms. */
+function toMs(value: number): number {
+    if (value <= 0) return 0;
+    return value < 1000 ? Math.round(value * 1000) : Math.round(value);
+}
+
+/** Ignore initial wrong duration (e.g. native sometimes sends ~15 min first). Max 10 min. */
+const MAX_REASONABLE_DURATION_MS = 10 * 60 * 1000;
+
+const PLAYBACK_SPEED_OPTIONS = [1, 1.25, 1.5, 2] as const;
+
+const AudioMessagePlayer = ({ url, isSent, duration: initialDuration = 0, messageId }: { url: string; isSent: boolean; duration?: number; messageId?: string }) => {
+    const [playbackDuration, setPlaybackDuration] = useState(0);
+    const [playbackPosition, setPlaybackPosition] = useState(0);
+    const [playbackSpeedIndex, setPlaybackSpeedIndex] = useState(0);
+    const playbackEventCountRef = useRef(0);
+    const progressAnim = useRef(new Animated.Value(0)).current;
+
+    const speed = PLAYBACK_SPEED_OPTIONS[playbackSpeedIndex];
+    const { startPlayer, pausePlayer, resumePlayer, state, setPlaybackSpeed } = useSound({
+        subscriptionDuration: 0.1,
+        onPlayback: (e: { duration: number; currentPosition: number; ended?: boolean }) => {
+            if (currentPlayingAudioUrl !== url) return;
+            const durationMs = toMs(e.duration);
+            let positionMs = toMs(e.currentPosition);
+            if (durationMs > 0 && durationMs <= MAX_REASONABLE_DURATION_MS) {
+                setPlaybackDuration(durationMs);
+            }
+            playbackEventCountRef.current += 1;
+            if (playbackEventCountRef.current <= 1) positionMs = 0;
+            const cap = durationMs > 0 && durationMs <= MAX_REASONABLE_DURATION_MS ? durationMs : MAX_REASONABLE_DURATION_MS;
+            setPlaybackPosition(Math.min(positionMs, cap));
+            if (e.ended) currentPlayingAudioUrl = null;
+        },
+        onPlaybackEnd: () => {
+            if (currentPlayingAudioUrl === url) currentPlayingAudioUrl = null;
+        },
+    });
+
+    const waveformHeights = useMemo(() => getStableWaveformHeights(messageId ?? url), [messageId, url]);
+
+    const totalMs = playbackDuration > 0 ? playbackDuration : (initialDuration * 1000);
+    const currentMs = playbackPosition;
+    const progressRaw = totalMs > 0 ? (currentMs / totalMs) * WAVEFORM_BAR_COUNT : 0;
+    const progress = Math.min(WAVEFORM_BAR_COUNT, Math.max(0, progressRaw));
+
+    useEffect(() => {
+        Animated.timing(progressAnim, {
+            toValue: progress,
+            duration: 80,
+            useNativeDriver: true,
+        }).start();
+    }, [progress, progressAnim]);
 
     const playPause = async () => {
         try {
             if (state.isPlaying) {
                 await pausePlayer();
             } else {
-                if (state.currentPosition === 0 || state.currentPosition >= state.duration) {
+                if (state.currentPosition === 0 || playbackPosition >= playbackDuration) {
+                    currentPlayingAudioUrl = url;
+                    setPlaybackPosition(0);
+                    playbackEventCountRef.current = 0;
                     await startPlayer(url);
+                    await setPlaybackSpeed(speed);
                 } else {
+                    currentPlayingAudioUrl = url;
                     await resumePlayer();
                 }
             }
@@ -39,50 +117,79 @@ const AudioMessagePlayer = ({ url, isSent, duration: initialDuration = 0 }: { ur
         }
     };
 
-    const formatTime = (ms: number) => {
-        const secs = Math.floor(ms / 1000);
-        const mins = Math.floor(secs / 60);
-        const s = Math.floor(secs % 60);
-        return `${mins}:${s < 10 ? '0' : ''}${s}`;
+    const cycleSpeed = () => {
+        const next = (playbackSpeedIndex + 1) % PLAYBACK_SPEED_OPTIONS.length;
+        setPlaybackSpeedIndex(next);
+        const newSpeed = PLAYBACK_SPEED_OPTIONS[next];
+        if (currentPlayingAudioUrl === url && state.isPlaying) {
+            setPlaybackSpeed(newSpeed).catch(() => { });
+        }
     };
 
-    const trackColor = isSent ? '#EAEAEA' : '#FFFFFF';
-    const playedColor = isSent ? '#1366D9' : '#2E8B57';
+    const durationLabel = totalMs > 0
+        ? (state.isPlaying && currentPlayingAudioUrl === url
+            ? `${formatDurationMs(currentMs)} / ${formatDurationMs(totalMs)}`
+            : playbackPosition > 0
+                ? `${formatDurationMs(currentMs)} / ${formatDurationMs(totalMs)}`
+                : formatDurationMs(totalMs))
+        : '0:00';
 
-    const activeDuration = state.duration > 0 ? state.duration : (initialDuration * 1000);
-    const progress = activeDuration > 0 ? (state.currentPosition / activeDuration) * 15 : 0;
-    const timeToDisplay = state.currentPosition > 0 ? state.currentPosition : activeDuration;
+    const trackColor = isSent ? '#EAEAEA' : 'rgba(255,255,255,0.4)';
+    const playedColor = COLORS.primary;
 
     return (
         <View style={styles.audioBubbleContainer}>
             <View style={styles.waveformContainer}>
-                {[...Array(15)].map((_, i) => (
-                    <View
-                        key={i}
-                        style={[
-                            styles.waveformBar,
-                            {
-                                height: Math.max(8, Math.random() * 24),
-                                backgroundColor: i <= progress ? playedColor : trackColor,
-                                opacity: i <= progress ? 1 : 0.5
-                            }
-                        ]}
-                    />
-                ))}
+                {waveformHeights.map((barHeight, i) => {
+                    const fillAmount = progressAnim.interpolate({
+                        inputRange: [i, i + 1],
+                        outputRange: [0, 1],
+                        extrapolateLeft: 'clamp',
+                        extrapolateRight: 'clamp',
+                    });
+                    const translateX = progressAnim.interpolate({
+                        inputRange: [i, i + 1],
+                        outputRange: [-1, 0],
+                        extrapolateLeft: 'clamp',
+                        extrapolateRight: 'clamp',
+                    });
+                    return (
+                        <View
+                            key={i}
+                            style={[styles.waveformBar, { height: barHeight, backgroundColor: trackColor, opacity: 0.5 }]}
+                        >
+                            <Animated.View
+                                style={[
+                                    StyleSheet.absoluteFill,
+                                    {
+                                        backgroundColor: playedColor,
+                                        opacity: 1,
+                                        transform: [{ scaleX: fillAmount }, { translateX }],
+                                    },
+                                ]}
+                            />
+                        </View>
+                    );
+                })}
             </View>
             <TouchableOpacity onPress={playPause} activeOpacity={0.8} style={{
                 justifyContent: 'center', alignItems: 'center', width: 28, height: 28, borderRadius: 14,
                 backgroundColor: isSent ? '#EAEAEA' : 'rgba(255,255,255,0.2)'
             }}>
-                {state.isPlaying ? (
-                    <Icon name="pause" size={16} color={isSent ? '#1366D9' : '#FFF'} />
+                {state.isPlaying && currentPlayingAudioUrl === url ? (
+                    <PauseIcon width={16} height={16} color={isSent ? '#1366D9' : '#FFF'} />
                 ) : (
                     <PlayButtonIcon width={28} height={28} />
                 )}
             </TouchableOpacity>
-            <Text style={{ fontSize: 10, color: isSent ? '#1366D9' : '#FFF', minWidth: 32, textAlign: 'right' }}>
-                {formatTime(timeToDisplay)}
-            </Text>
+            <View style={styles.audioTimeAndSpeed}>
+                <Text style={{ fontSize: 10, color: isSent ? '#1366D9' : '#FFF', minWidth: 40, textAlign: 'right' }}>
+                    {durationLabel}
+                </Text>
+                <TouchableOpacity onPress={cycleSpeed} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} style={styles.speedChip}>
+                    <Text style={[styles.speedChipText, { color: isSent ? '#1366D9' : '#FFF' }]}>{speed}x</Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 };
@@ -94,11 +201,15 @@ const ChatRoom = () => {
 
     // Fallback ID if not provided, though it typically should be
     const chatId = route.params?.chatId;
+    const { startCall } = useCall();
 
     const [message, setMessage] = useState('');
     const [uploading, setUploading] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [recordTime, setRecordTime] = useState(0);
+    const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+    const [pendingAttachment, setPendingAttachment] = useState<{ uri: string; name: string; type: string; size?: number } | null>(null);
+    const [expandedMessageIds, setExpandedMessageIds] = useState<Record<string, boolean>>({});
 
     const { startRecorder, stopRecorder } = useSound({
         onRecord: (e) => setRecordTime(e.currentPosition)
@@ -116,8 +227,11 @@ const ChatRoom = () => {
     // Resolve Chat Details (for header avatar/name)
     const currentChat = chats.find(c => c.id === chatId);
     const otherParticipant = currentChat?.participants?.find((p: any) => p.id !== userId) || currentChat?.participants?.[0];
-    const headerName = currentChat?.name || otherParticipant?.name || 'Chat';
-    const headerAvatar = currentChat?.avatar || otherParticipant?.avatar || 'https://i.pravatar.cc/150';
+    const headerNameFull = otherParticipant?.username || otherParticipant?.name || currentChat?.title || currentChat?.name || 'Chat';
+    const headerName = (headerNameFull || '').trim().split(/\s+/)[0] || headerNameFull;
+    const headerAvatarUri = currentChat?.avatar || otherParticipant?.avatar;
+    const showHeaderAvatarImage = !!headerAvatarUri;
+    const headerAvatarInitial = (headerName || '?').trim().charAt(0).toUpperCase() || '?';
     const otherUserId = otherParticipant?.id;
     const isOnline = otherUserId && onlineStatuses[otherUserId]?.status === 'online';
 
@@ -206,6 +320,14 @@ const ChatRoom = () => {
             const mimeType = Platform.OS === 'ios' ? 'audio/x-m4a' : 'audio/mp4';
             const fileName = `voice_message_${Date.now()}.${extension}`;
 
+            let fileSize = 0;
+            try {
+                const stat = await ReactNativeBlobUtil.fs.stat(uri);
+                fileSize = typeof stat?.size === 'number' ? stat.size : parseInt(String(stat?.size ?? 0), 10) || 0;
+            } catch (_) {
+                // keep 0 if stat fails (e.g. content URI on some devices)
+            }
+
             const uploadRes = await uploadFile(uri, fileName, mimeType);
 
             if (uploadRes.success && uploadRes.publicUrl) {
@@ -214,10 +336,12 @@ const ChatRoom = () => {
                     attachments: [{
                         url: uploadRes.publicUrl,
                         key: uploadRes.filename,
-                        name: 'Voice Message',
+                        name: fileName,
                         mimeType,
-                        size: 0
-                    }]
+                        size: fileSize,
+                        extension,
+                    }],
+                    clientMessageId: `audio-${Date.now()}`,
                 });
             } else {
                 Alert.alert('Upload Failed', 'There was an issue sending your voice message.');
@@ -238,33 +362,66 @@ const ChatRoom = () => {
 
             if (!result || !result.uri) return;
 
-            setUploading(true);
-
-            // Execute the highly scalable 2-step S3 flow documented
-            const uploadRes = await uploadFile(result.uri, result.name || 'attachment.file', result.type || 'application/octet-stream');
-
-            if (uploadRes.success && uploadRes.publicUrl) {
-                // Instantly dispatch out standard socket payload containing attachment
-                socketService.emit('chat:message:send', {
-                    chatId,
-                    attachments: [{
-                        url: uploadRes.publicUrl,
-                        key: uploadRes.filename,
-                        name: result.name,
-                        mimeType: result.type,
-                        size: result.size
-                    }]
-                });
-            } else {
-                Alert.alert('Upload Failed', 'There was an issue uploading your file. Please try again.');
-            }
+            setPendingAttachment({
+                uri: result.uri,
+                name: result.name || 'attachment.file',
+                type: result.type || 'application/octet-stream',
+                size: result.size ?? undefined,
+            });
         } catch (err: any) {
             if (!DocumentPicker.isCancel(err)) {
                 console.error('attachment picker error', err);
                 Alert.alert('Error', 'Failed to pick attachment');
             }
+        }
+    };
+
+    const handleCancelPendingAttachment = () => {
+        setPendingAttachment(null);
+    };
+
+    const handleSendPendingAttachment = async () => {
+        if (!pendingAttachment) return;
+        setUploading(true);
+        try {
+            const uploadRes = await uploadFile(
+                pendingAttachment.uri,
+                pendingAttachment.name,
+                pendingAttachment.type
+            );
+            if (uploadRes.success && uploadRes.publicUrl) {
+                socketService.emit('chat:message:send', {
+                    chatId,
+                    attachments: [{
+                        url: uploadRes.publicUrl,
+                        key: uploadRes.filename,
+                        name: pendingAttachment.name,
+                        mimeType: pendingAttachment.type,
+                        size: pendingAttachment.size ?? 0,
+                    }],
+                    clientMessageId: `file-${Date.now()}`,
+                });
+                setPendingAttachment(null);
+            } else {
+                Alert.alert('Upload Failed', 'There was an issue uploading your file. Please try again.');
+            }
+        } catch (err: any) {
+            console.error('attachment upload error', err);
+            Alert.alert('Error', 'Failed to upload file.');
         } finally {
             setUploading(false);
+        }
+    };
+
+    const handleOpenAttachment = (att: { url: string; mimeType?: string; name?: string }) => {
+        if (!att?.url) return;
+        const mime = (att.mimeType || '').toLowerCase();
+        if (mime.includes('image')) {
+            setPreviewImageUrl(att.url);
+        } else {
+            Linking.openURL(att.url).catch(() => {
+                Alert.alert('Cannot Open', 'This file could not be opened. You can copy the link and open it in a browser.');
+            });
         }
     };
 
@@ -287,24 +444,60 @@ const ChatRoom = () => {
                 ]}>
                     {hasAttachment && mainAttachment ? (
                         mainAttachment.mimeType?.includes('image') ? (
-                            <Image source={{ uri: mainAttachment.url }} style={{ width: 150, height: 150, borderRadius: 8, marginBottom: 4 }} resizeMode="cover" />
+                            <TouchableOpacity activeOpacity={0.9} onPress={() => handleOpenAttachment(mainAttachment)}>
+                                <Image source={{ uri: mainAttachment.url }} style={{ width: 150, height: 150, borderRadius: 8, marginBottom: 4 }} resizeMode="cover" />
+                            </TouchableOpacity>
                         ) : mainAttachment.mimeType?.includes('audio') ? (
-                            <AudioMessagePlayer url={mainAttachment.url} isSent={isSent} />
+                            <AudioMessagePlayer
+                                url={mainAttachment.url}
+                                isSent={isSent}
+                                duration={mainAttachment.duration}
+                                messageId={item.id}
+                            />
                         ) : (
-                            <Text style={[styles.messageText, isSent ? styles.messageTextSent : styles.messageTextReceived, { fontStyle: 'italic', textDecorationLine: 'underline' }]}>
-                                {mainAttachment.name || 'Attached File'}
-                            </Text>
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => handleOpenAttachment(mainAttachment)}
+                                style={styles.fileAttachmentTouchable}
+                            >
+                                <Text style={[styles.messageText, isSent ? styles.messageTextSent : styles.messageTextReceived, styles.fileAttachmentText]}>
+                                    {mainAttachment.name || 'Attached File'}
+                                </Text>
+                            </TouchableOpacity>
                         )
                     ) : null}
 
-                    {!!item.content && (
-                        <Text style={[
-                            styles.messageText,
-                            isSent ? styles.messageTextSent : styles.messageTextReceived
-                        ]}>
-                            {item.content}
-                        </Text>
-                    )}
+                    {!!item.content && (() => {
+                        const content = item.content;
+                        const isLong = content.length > 150;
+                        const isExpanded = expandedMessageIds[item.id];
+                        const showSeeMore = isLong && !isExpanded;
+                        const showSeeLess = isLong && isExpanded;
+                        return (
+                            <View>
+                                <Text
+                                    style={[
+                                        styles.messageText,
+                                        isSent ? styles.messageTextSent : styles.messageTextReceived
+                                    ]}
+                                    numberOfLines={showSeeMore ? 4 : undefined}
+                                >
+                                    {content}
+                                </Text>
+                                {(showSeeMore || showSeeLess) && (
+                                    <TouchableOpacity
+                                        onPress={() => setExpandedMessageIds(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                        style={[styles.seeMoreTouchable, isSent ? styles.seeMoreTouchableSent : styles.seeMoreTouchableReceived]}
+                                    >
+                                        <Text style={[styles.seeMoreText, isSent ? styles.messageTextSent : styles.messageTextReceived]}>
+                                            {showSeeMore ? 'See more' : 'See less'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        );
+                    })()}
 
                     <Text style={{
                         fontSize: 10,
@@ -319,9 +512,44 @@ const ChatRoom = () => {
         );
     };
 
+    const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
     return (
         <SafeAreaView style={styles.safeArea}>
             <ImageBackground source={chatScreenBg} style={styles.background} resizeMode="cover">
+
+                {/* Full-screen image preview modal */}
+                <Modal
+                    visible={!!previewImageUrl}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setPreviewImageUrl(null)}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        style={styles.previewOverlay}
+                        onPress={() => setPreviewImageUrl(null)}
+                    >
+                        <View style={styles.previewContent} pointerEvents="box-none">
+                            {previewImageUrl ? (
+                                <TouchableOpacity activeOpacity={1} onPress={() => setPreviewImageUrl(null)} style={styles.previewImageWrap}>
+                                    <Image
+                                        source={{ uri: previewImageUrl }}
+                                        style={[styles.previewImage, { width: screenWidth, height: screenHeight }]}
+                                        resizeMode="contain"
+                                    />
+                                </TouchableOpacity>
+                            ) : null}
+                            <TouchableOpacity
+                                style={styles.previewCloseButton}
+                                onPress={() => setPreviewImageUrl(null)}
+                                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                            >
+                                <CloseIcon width={16} height={16} color={COLORS.white} />
+                            </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                </Modal>
 
                 {/* Custom Header */}
                 <View style={styles.headerContainer}>
@@ -334,7 +562,13 @@ const ChatRoom = () => {
                     </TouchableOpacity>
 
                     <View style={styles.userInfoContainer}>
-                        <Image source={{ uri: headerAvatar }} style={styles.headerAvatar} />
+                        {showHeaderAvatarImage ? (
+                            <Image source={{ uri: headerAvatarUri }} style={styles.headerAvatar} />
+                        ) : (
+                            <View style={styles.headerAvatarPlaceholder}>
+                                <Text style={styles.headerAvatarPlaceholderText}>{headerAvatarInitial}</Text>
+                            </View>
+                        )}
                         <View style={styles.userInfoText}>
                             <Text style={styles.userName}>{headerName}</Text>
                             <Text style={styles.userStatus}>{isOnline ? 'Online' : 'Offline'}</Text>
@@ -344,6 +578,23 @@ const ChatRoom = () => {
                     <View style={styles.headerActionsPill}>
                         <TouchableOpacity style={styles.actionIconPill} activeOpacity={0.7}>
                             <CalenderBlueIcon width={24} height={24} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.actionIconPill}
+                            activeOpacity={0.7}
+                            onPress={() => {
+                                if (otherUserId && selectedWorkspaceId && chatId) {
+                                    startCall({
+                                        workspaceId: selectedWorkspaceId,
+                                        chatId,
+                                        peerUserId: otherUserId,
+                                        peerUsername: headerNameFull,
+                                        kind: 'audio'
+                                    });
+                                }
+                            }}
+                        >
+                            <PhoneIcon width={24} height={24} />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.actionIconPill} activeOpacity={0.7}>
                             <ChatVideoCamIcon width={24} height={24} />
@@ -374,8 +625,22 @@ const ChatRoom = () => {
                 {/* Input Area */}
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 55 : 20}
                 >
+                    {pendingAttachment ? (
+                        <View style={styles.attachmentPreviewBar}>
+                            <Text style={styles.attachmentPreviewName} numberOfLines={1}>
+                                {pendingAttachment.name}
+                            </Text>
+                            <TouchableOpacity
+                                onPress={handleCancelPendingAttachment}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                style={styles.attachmentPreviewClose}
+                            >
+                                <CloseIcon width={16} height={16} color={COLORS.white} />
+                            </TouchableOpacity>
+                        </View>
+                    ) : null}
                     <View style={styles.inputContainer}>
                         <View style={styles.textInputWrapper}>
                             {isRecording ? (
@@ -392,7 +657,7 @@ const ChatRoom = () => {
                                     placeholderTextColor="#8E8E93"
                                     value={message}
                                     onChangeText={setMessage}
-                                    onSubmitEditing={handleSendMessage}
+                                    onSubmitEditing={pendingAttachment ? handleSendPendingAttachment : handleSendMessage}
                                 />
                             )}
                             {uploading ? (
@@ -405,7 +670,11 @@ const ChatRoom = () => {
                         </View>
 
                         {!isRecording && (
-                            <TouchableOpacity style={styles.iconButton} activeOpacity={0.8} onPress={handleSendMessage}>
+                            <TouchableOpacity
+                                style={styles.iconButton}
+                                activeOpacity={0.8}
+                                onPress={pendingAttachment ? handleSendPendingAttachment : handleSendMessage}
+                            >
                                 <SendPaperplaneIcon width={24} height={24} />
                             </TouchableOpacity>
                         )}
@@ -416,7 +685,7 @@ const ChatRoom = () => {
                             onPress={isRecording ? handleStopRecording : handleStartRecording}
                         >
                             {isRecording ? (
-                                <Icon name="stop" size={24} color="#FFF" />
+                                <StopIcon width={24} height={24} />
                             ) : (
                                 <MicIcon width={24} height={24} />
                             )}
@@ -467,6 +736,21 @@ const styles = StyleSheet.create({
         height: 44,
         borderRadius: 22,
         marginRight: 10,
+    },
+    headerAvatarPlaceholder: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        marginRight: 10,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerAvatarPlaceholderText: {
+        fontFamily: FONT_BODY,
+        fontSize: 18,
+        fontWeight: '700',
+        color: COLORS.white,
     },
     userInfoText: {
         justifyContent: 'center',
@@ -562,6 +846,25 @@ const styles = StyleSheet.create({
     messageTextSent: {
         color: '#1366D9',
     },
+    seeMoreTouchable: {
+        alignSelf: 'flex-end',
+        marginTop: 10,
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        borderRadius: 6,
+    },
+    seeMoreTouchableSent: {
+        backgroundColor: 'rgba(19, 102, 217, 0.12)',
+    },
+    seeMoreTouchableReceived: {
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    seeMoreText: {
+        fontFamily: FONT_BODY,
+        fontSize: 14,
+        fontWeight: '700',
+        textDecorationLine: 'underline',
+    },
     audioBubbleContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -578,6 +881,90 @@ const styles = StyleSheet.create({
         width: 2,
         backgroundColor: '#2E8B57',
         borderRadius: 1,
+        overflow: 'hidden',
+    },
+    audioTimeAndSpeed: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        minWidth: 52,
+    },
+    speedChip: {
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+        borderRadius: 4,
+        backgroundColor: 'rgba(0,0,0,0.12)',
+    },
+    speedChipText: {
+        fontSize: 9,
+        fontWeight: '600',
+    },
+    fileAttachmentTouchable: {
+        alignSelf: 'flex-start',
+        paddingVertical: 4,
+        paddingRight: 4,
+        maxWidth: '100%',
+    },
+    fileAttachmentText: {
+        fontStyle: 'italic',
+        textDecorationLine: 'underline',
+        flexShrink: 1,
+    },
+    previewOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    previewContent: {
+        flex: 1,
+        width: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    previewImageWrap: {
+        flex: 1,
+        width: '100%',
+    },
+    previewImage: {
+        flex: 1,
+    },
+    previewCloseButton: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    attachmentPreviewBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'stretch',
+        marginHorizontal: 16,
+        marginBottom: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 12,
+        gap: 8,
+    },
+    attachmentPreviewName: {
+        flex: 1,
+        fontFamily: FONT_BODY,
+        fontSize: 14,
+        color: COLORS.white,
+    },
+    attachmentPreviewClose: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     inputContainer: {
         flexDirection: 'row',

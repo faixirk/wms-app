@@ -1,5 +1,7 @@
 /Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-community/datetimepicker/android/build/generated/source/codegen/jni/CMakeLists.txt
 /Volumes/Amaze/GithubProjects/wms-app/node_modules/@react-native-community/netinfo/android/build/generated/source/codegen/jni/CMakeLists.txt
+/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-blob-util/android/build/generated/source/codegen/jni/CMakeLists.txt
+/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-document-picker/android/build/generated/source/codegen/jni/CMakeLists.txt
 /Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-gesture-handler/android/build/generated/source/codegen/jni/CMakeLists.txt
 /Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-nitro-modules/android/build/generated/source/codegen/jni/CMakeLists.txt
 /Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-reanimated/android/build/generated/source/codegen/jni/CMakeLists.txt

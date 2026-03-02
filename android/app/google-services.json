@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "185031522268",
+    "project_id": "wms-app-514d8",
+    "storage_bucket": "wms-app-514d8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:185031522268:android:ef3052d2f06e1735d20119",
+        "android_client_info": {
+          "package_name": "com.wmsapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB6ij6qbKX-sDCkGEZXVbe_AZ57JUkmUNs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
