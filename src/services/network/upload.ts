@@ -8,6 +8,8 @@ export interface UploadedFileResponse {
     url?: string;
     publicUrl?: string;
     filename?: string;
+    /** Size in bytes when known (e.g. from blob on iOS). Backend may require this for attachments. */
+    size?: number;
 }
 
 /** On Android, content:// URIs must be read via native modules; standard fetch() fails. */
@@ -80,6 +82,7 @@ export const uploadFile = async (
                 success: true,
                 publicUrl: publicUrl,
                 filename: s3Key,
+                size: typeof fileBody.size === 'number' ? fileBody.size : undefined,
             };
         }
         throw new Error(`S3 Upload failed: ${uploadRes.status} ${uploadRes.statusText}`);

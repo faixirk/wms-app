@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "prefabPath": "/Users/nextbyte/.gradle/caches/modules-2/files-2.1/com.google.prefab/cli/2.1.0/aa32fec809c44fa531f01dcfb739b5b3304d3050/cli-2.1.0-all.jar",
+  "packages": [
+    "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-nitro-modules/android/build/intermediates/prefab_package/release/prefab",
+    "/Users/nextbyte/.gradle/caches/9.0.0/transforms/9df50aa1ef72cf0be52992e40deb3a9a/transformed/react-android-0.84.0-release/prefab",
+    "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-reanimated/android/build/intermediates/prefab_package/release/prefab",
+    "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-worklets/android/build/intermediates/prefab_package/release/prefab",
+    "/Users/nextbyte/.gradle/caches/9.0.0/transforms/ca4d19546d55b4ed7409adc66c1db842/transformed/hermes-android-250829098.0.7-release/prefab",
+    "/Users/nextbyte/.gradle/caches/9.0.0/transforms/70039f1a0293b9b2989e59e5e4c81c72/transformed/fbjni-0.7.0/prefab"
+  ]
+}

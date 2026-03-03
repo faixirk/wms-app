@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import DocumentPicker from 'react-native-document-picker';
-import { ArrowWhiteLeftIcon, CalenderBlueIcon, ChatVideoCamIcon, SendPaperplaneIcon, MicIcon, AttachmentIcon, PlayButtonIcon, StopIcon, PauseIcon, CloseIcon, PhoneIcon } from '../../assets/svgs';
+import { ArrowWhiteLeftIcon, CalenderBlueIcon, ChatVideoCamIcon, SendPaperplaneIcon, MicIcon, AttachmentIcon, PlayButtonIcon, StopIcon, PauseIcon, CloseIcon, PhoneIcon, CallIcon } from '../../assets/svgs';
 import { chatScreenBg } from '../../assets/images';
 import { COLORS } from '../../constants/colors';
 import { FONT_HEADING, FONT_BODY } from '../../constants/fonts';
@@ -52,6 +52,14 @@ function toMs(value: number): number {
 const MAX_REASONABLE_DURATION_MS = 10 * 60 * 1000;
 
 const PLAYBACK_SPEED_OPTIONS = [1, 1.25, 1.5, 2] as const;
+
+/** iOS AVAudioPlayer does not support WebM. Remote .webm URLs cause OSStatus 1954115647. */
+const isUnsupportedAudioFormatOnIOS = (audioUrl: string): boolean => {
+    if (Platform.OS !== 'ios') return false;
+    const pathWithoutQuery = (audioUrl || '').split('?')[0];
+    const ext = pathWithoutQuery.split('.').pop()?.toLowerCase() ?? '';
+    return ext === 'webm';
+};
 
 const AudioMessagePlayer = ({ url, isSent, duration: initialDuration = 0, messageId }: { url: string; isSent: boolean; duration?: number; messageId?: string }) => {
     const [playbackDuration, setPlaybackDuration] = useState(0);
@@ -101,6 +109,13 @@ const AudioMessagePlayer = ({ url, isSent, duration: initialDuration = 0, messag
             if (state.isPlaying) {
                 await pausePlayer();
             } else {
+                // if (isUnsupportedAudioFormatOnIOS(url)) {
+                //     Alert.alert(
+                //         'Format not supported',
+                //         'WebM audio cannot be played on this device. Ask the sender to send the message in a different format (e.g. from the mobile app).'
+                //     );
+                //     return;
+                // }
                 if (state.currentPosition === 0 || playbackPosition >= playbackDuration) {
                     currentPlayingAudioUrl = url;
                     setPlaybackPosition(0);
@@ -210,6 +225,7 @@ const ChatRoom = () => {
     const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
     const [pendingAttachment, setPendingAttachment] = useState<{ uri: string; name: string; type: string; size?: number } | null>(null);
     const [expandedMessageIds, setExpandedMessageIds] = useState<Record<string, boolean>>({});
+    const [callOptionsVisible, setCallOptionsVisible] = useState(false);
 
     const { startRecorder, stopRecorder } = useSound({
         onRecord: (e) => setRecordTime(e.currentPosition)
@@ -331,6 +347,10 @@ const ChatRoom = () => {
             const uploadRes = await uploadFile(uri, fileName, mimeType);
 
             if (uploadRes.success && uploadRes.publicUrl) {
+                // Prefer size from upload (blob) so iOS voice gets correct size when stat fails
+                const attachmentSize = typeof uploadRes.size === 'number' && uploadRes.size > 0
+                    ? uploadRes.size
+                    : fileSize;
                 socketService.emit('chat:message:send', {
                     chatId,
                     attachments: [{
@@ -338,7 +358,7 @@ const ChatRoom = () => {
                         key: uploadRes.filename,
                         name: fileName,
                         mimeType,
-                        size: fileSize,
+                        size: attachmentSize,
                         extension,
                     }],
                     clientMessageId: `audio-${Date.now()}`,
@@ -551,6 +571,54 @@ const ChatRoom = () => {
                     </TouchableOpacity>
                 </Modal>
 
+                {/* Call options bottom sheet */}
+                <Modal
+                    visible={callOptionsVisible}
+                    transparent
+                    animationType="slide"
+                    onRequestClose={() => setCallOptionsVisible(false)}
+                >
+                    <View style={styles.callSheetBackdrop}>
+                        <TouchableOpacity
+                            style={StyleSheet.absoluteFill}
+                            activeOpacity={1}
+                            onPress={() => setCallOptionsVisible(false)}
+                        />
+                        <View style={styles.callSheetContent}>
+                            <View style={styles.callSheetHandle} />
+                            <Text style={styles.callSheetTitle}>Choose call type</Text>
+                            <TouchableOpacity
+                                style={styles.callSheetOption}
+                                activeOpacity={0.7}
+                                onPress={() => {
+                                    setCallOptionsVisible(false);
+                                    if (otherUserId && selectedWorkspaceId && chatId) {
+                                        startCall({
+                                            workspaceId: selectedWorkspaceId,
+                                            chatId,
+                                            peerUserId: otherUserId,
+                                            peerUsername: headerNameFull,
+                                            kind: 'audio',
+                                        });
+                                    }
+                                }}
+                            >
+                                <CallIcon width={20} height={20} />
+                                <Text style={styles.callSheetOptionText}>Audio call</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.callSheetOption}
+                                activeOpacity={0.7}
+                                onPress={() => {
+                                }}
+                            >
+                                <ChatVideoCamIcon width={24} height={24} />
+                                <Text style={styles.callSheetOptionText}>Video call</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
+
                 {/* Custom Header */}
                 <View style={styles.headerContainer}>
                     <TouchableOpacity
@@ -582,22 +650,9 @@ const ChatRoom = () => {
                         <TouchableOpacity
                             style={styles.actionIconPill}
                             activeOpacity={0.7}
-                            onPress={() => {
-                                if (otherUserId && selectedWorkspaceId && chatId) {
-                                    startCall({
-                                        workspaceId: selectedWorkspaceId,
-                                        chatId,
-                                        peerUserId: otherUserId,
-                                        peerUsername: headerNameFull,
-                                        kind: 'audio'
-                                    });
-                                }
-                            }}
+                            onPress={() => setCallOptionsVisible(true)}
                         >
-                            <PhoneIcon width={24} height={24} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionIconPill} activeOpacity={0.7}>
-                            <ChatVideoCamIcon width={24} height={24} />
+                            <CallIcon width={20} height={20} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -791,6 +846,49 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 4,
         elevation: 2,
+    },
+    callSheetBackdrop: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    callSheetContent: {
+        backgroundColor: COLORS.white,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        paddingTop: 12,
+        paddingBottom: 34,
+        paddingHorizontal: 24,
+    },
+    callSheetHandle: {
+        width: 36,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#D1D1D6',
+        alignSelf: 'center',
+        marginBottom: 20,
+    },
+    callSheetTitle: {
+        fontFamily: FONT_HEADING,
+        fontSize: 18,
+        color: '#1C1C1E',
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    callSheetOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        backgroundColor: '#F2F2F7',
+        marginBottom: 12,
+        gap: 14,
+    },
+    callSheetOptionText: {
+        fontFamily: FONT_BODY,
+        fontSize: 16,
+        color: '#1C1C1E',
     },
     chatListContent: {
         paddingHorizontal: 20,

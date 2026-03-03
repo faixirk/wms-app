@@ -273,6 +273,30 @@
         }
       }
     },
+    "react-native-incall-manager": {
+      "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-incall-manager",
+      "name": "react-native-incall-manager",
+      "platforms": {
+        "ios": {
+          "podspecPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-incall-manager/ReactNativeIncallManager.podspec",
+          "version": "4.2.1",
+          "configurations": [],
+          "scriptPhases": []
+        },
+        "android": {
+          "sourceDir": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-incall-manager/android",
+          "packageImportPath": "import com.zxcpoiu.incallmanager.InCallManagerPackage;",
+          "packageInstance": "new InCallManagerPackage()",
+          "buildTypes": [],
+          "componentDescriptors": [],
+          "cmakeListsPath": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-incall-manager/android/build/generated/source/codegen/jni/CMakeLists.txt",
+          "cxxModuleCMakeListsModuleName": null,
+          "cxxModuleCMakeListsPath": null,
+          "cxxModuleHeaderName": null,
+          "isPureCxxDependency": false
+        }
+      }
+    },
     "react-native-mmkv": {
       "root": "/Volumes/Amaze/GithubProjects/wms-app/node_modules/react-native-mmkv",
       "name": "react-native-mmkv",

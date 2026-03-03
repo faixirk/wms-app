@@ -20,8 +20,12 @@ export const requestUserPermission = async (): Promise<string | null> => {
     return getFcmToken();
 };
 
+/** Error message when APNS is unavailable (e.g. iOS Simulator). */
+const NO_APNS_TOKEN_MESSAGE = 'No APNS token';
+
 /**
  * Retrieves the Firebase Cloud Messaging device token.
+ * On iOS Simulator, APNS is not available so this returns null (expected).
  */
 export const getFcmToken = async (): Promise<string | null> => {
     try {
@@ -31,8 +35,15 @@ export const getFcmToken = async (): Promise<string | null> => {
         const token = await messaging().getToken();
         console.log('Firebase Cloud Messaging Token:', token);
         return token;
-    } catch (error) {
-        console.error('Error getting FCM token:', error);
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        const isNoApns = message.includes(NO_APNS_TOKEN_MESSAGE) || message.includes('APNS');
+        if (Platform.OS === 'ios' && isNoApns) {
+            // Expected on iOS Simulator or when push isn't set up yet
+            console.warn('FCM token unavailable (iOS Simulator or APNS not ready):', message);
+        } else {
+            console.error('Error getting FCM token:', error);
+        }
         return null;
     }
 };

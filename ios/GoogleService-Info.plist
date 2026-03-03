@@ -9,22 +9,22 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.wmsapp</string>
+	<string>com.wms365.app</string>
 	<key>PROJECT_ID</key>
 	<string>wms-app-514d8</string>
 	<key>STORAGE_BUCKET</key>
 	<string>wms-app-514d8.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
-	<false></false>
+	<false/>
 	<key>IS_ANALYTICS_ENABLED</key>
-	<false></false>
+	<false/>
 	<key>IS_APPINVITE_ENABLED</key>
-	<true></true>
+	<true/>
 	<key>IS_GCM_ENABLED</key>
-	<true></true>
+	<true/>
 	<key>IS_SIGNIN_ENABLED</key>
-	<true></true>
+	<true/>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:185031522268:ios:8d5ac87c0f62d16fd20119</string>
+	<string>1:185031522268:ios:06db462d80b9b30fd20119</string>
 </dict>
 </plist>

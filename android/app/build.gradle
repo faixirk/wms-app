@@ -93,6 +93,21 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+
+release {
+      storeFile file('wmsKey.keystore')
+      storePassword '123456'
+      keyAlias 'key0'
+      keyPassword '123456'
+    }
+    }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+        resources {
+            excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE', 'META-INF/NOTICE.txt', 'META-INF/*.kotlin_module']
+        }
     }
     buildTypes {
         debug {
@@ -101,7 +116,7 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

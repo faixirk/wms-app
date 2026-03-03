@@ -1,15 +1,38 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, Modal,
     TouchableOpacity
 } from 'react-native';
+import { RTCView } from 'react-native-webrtc';
 import { useCall } from '../context/CallContext';
 import { COLORS } from '../constants/colors';
 import { FONT_HEADING, FONT_BODY } from '../constants/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+function formatCallDuration(ms: number): string {
+    const totalSecs = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
 const CallOverlay = () => {
-    const { callState, callData, acceptCall, declineCall, hangupCall, toggleMic, isMicMuted } = useCall();
+    const { callState, callData, callConnectedAt, localStream, remoteStream, acceptCall, declineCall, hangupCall, toggleMic, isMicMuted } = useCall();
+    const [callDurationSecs, setCallDurationSecs] = useState(0);
+
+    const isInCall = callState === 'in-call';
+
+    // Update call duration every second when connected (must be called unconditionally – Rules of Hooks)
+    useEffect(() => {
+        if (!isInCall || callConnectedAt == null) {
+            setCallDurationSecs(0);
+            return;
+        }
+        const update = () => setCallDurationSecs(Math.floor((Date.now() - callConnectedAt) / 1000));
+        update();
+        const interval = setInterval(update, 1000);
+        return () => clearInterval(interval);
+    }, [isInCall, callConnectedAt]);
 
     if (callState === 'idle' || !callData) {
         return null; // Don't render anything when idle
@@ -18,7 +41,6 @@ const CallOverlay = () => {
     const { kind, fromUsername, toUserId } = callData;
     const isIncoming = callState === 'incoming';
     const isOutgoing = callState === 'outgoing';
-    const isInCall = callState === 'in-call';
 
     const getTitle = () => {
         if (isIncoming) return `Incoming ${kind === 'video' ? 'Video' : 'Voice'} Call`;
@@ -34,15 +56,40 @@ const CallOverlay = () => {
         return 'Unknown';
     };
 
+    const remoteStreamUrl = remoteStream?.toURL?.();
+    const localStreamUrl = localStream?.toURL?.();
+
     return (
         <Modal transparent visible animationType="fade">
             <View style={styles.overlay}>
-                <SafeAreaView style={styles.container}>
+                {/* Full-screen RTCView required for native audio playback (react-native-webrtc) */}
+                {isInCall && remoteStreamUrl ? (
+                    <RTCView
+                        style={styles.remoteStreamView}
+                        streamURL={remoteStreamUrl}
+                        objectFit="cover"
+                        zOrder={0}
+                    />
+                ) : null}
+                {isInCall && localStreamUrl && callData.kind === 'video' ? (
+                    <RTCView
+                        style={styles.localStreamView}
+                        streamURL={localStreamUrl}
+                        objectFit="cover"
+                        mirror
+                        zOrder={1}
+                    />
+                ) : null}
+                <SafeAreaView style={[styles.container, styles.containerOnTop]}>
                     <View style={styles.headerInfo}>
                         <Text style={styles.title}>{getTitle()}</Text>
                         <Text style={styles.name}>{getName()}</Text>
                         <Text style={styles.status}>
-                            {isInCall ? 'Connected' : isOutgoing ? 'Ringing...' : 'Waiting for answer...'}
+                            {isInCall
+                                ? (callConnectedAt != null ? formatCallDuration((callDurationSecs || 0) * 1000) : 'Connected')
+                                : isOutgoing
+                                    ? 'Ringing...'
+                                    : 'Waiting for answer...'}
                         </Text>
                     </View>
 
@@ -86,6 +133,25 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.85)',
         justifyContent: 'center',
+    },
+    remoteStreamView: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 0,
+        backgroundColor: '#000',
+    },
+    localStreamView: {
+        position: 'absolute',
+        top: 100,
+        right: 20,
+        width: 100,
+        height: 140,
+        borderRadius: 8,
+        zIndex: 1,
+        backgroundColor: '#333',
+        overflow: 'hidden',
+    },
+    containerOnTop: {
+        zIndex: 2,
     },
     container: {
         flex: 1,

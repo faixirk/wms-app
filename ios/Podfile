@@ -33,5 +33,16 @@ target 'WmsApp' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Fix NitroModules (and dependent Nitro pods) Swift/C++ interop when building for device (iphoneos).
+    # Avoids "error_code/error_condition unavailable (cannot import)" from C++ stdlib.
+    installer.pods_project.targets.each do |target|
+      if target.name.start_with?('Nitro')
+        target.build_configurations.each do |config|
+          config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'NO'
+          config.build_settings['ENABLE_MODULE_VERIFIER'] = 'NO'
+        end
+      end
+    end
   end
 end

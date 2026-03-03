@@ -343,6 +343,7 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     listContainer: {
+        flex: 1,
         backgroundColor: COLORS.white,
         borderRadius: 20,
         paddingHorizontal: 16,
