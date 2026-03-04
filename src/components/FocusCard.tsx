@@ -12,12 +12,17 @@ export interface BadgeConfig {
     icon?: React.ReactNode;
 }
 
+export interface AvatarProp {
+    uri?: string | null;
+    initial?: string;
+}
+
 export interface FocusCardProps {
     title: string;
     dateText?: string;
     statusBadgeConfig?: BadgeConfig;
     priorityBadgeConfig?: BadgeConfig;
-    avatars?: ImageSourcePropType[];
+    avatars?: AvatarProp[];
     extraAvatarsCount?: number;
     actionNode?: React.ReactNode;
     children?: React.ReactNode;
@@ -74,13 +79,27 @@ const FocusCard: React.FC<FocusCardProps> = ({
                 {/* Bottom Row: Avatars, Priority, Action area */}
                 <View style={styles.bottomRow}>
                     <View style={styles.avatarsContainer}>
-                        {avatars.map((img, index) => (
-                            <Image
-                                key={index}
-                                source={img}
-                                style={[styles.avatar, { marginLeft: index > 0 ? -12 : 0 }]}
-                            />
-                        ))}
+                        {avatars.map((avatarData, index) => {
+                            const isFirst = index === 0;
+                            const marginLeft = isFirst ? 0 : -12;
+
+                            if (avatarData.uri) {
+                                return (
+                                    <Image
+                                        key={index}
+                                        source={{ uri: avatarData.uri }}
+                                        style={[styles.avatar, { marginLeft }]}
+                                    />
+                                );
+                            } else {
+                                const initial = avatarData.initial || '?';
+                                return (
+                                    <View key={index} style={[styles.avatarPlaceholder, { marginLeft }]}>
+                                        <Text style={styles.avatarPlaceholderText}>{initial}</Text>
+                                    </View>
+                                );
+                            }
+                        })}
                         {extraAvatarsCount > 0 && (
                             <Text style={styles.extraAvatarsText}>+{extraAvatarsCount}</Text>
                         )}
@@ -194,6 +213,25 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         borderWidth: 2,
         borderColor: COLORS.white,
+    },
+    avatarPlaceholder: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        borderWidth: 2,
+        borderColor: COLORS.white,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarPlaceholderText: {
+        fontSize: 12,
+        fontFamily: FONT_HEADING,
+        color: COLORS.white,
+        textAlign: 'center',
+        includeFontPadding: false,
+        textAlignVertical: 'center',
+        lineHeight: 14,
     },
     extraAvatarsText: {
         fontSize: 14,

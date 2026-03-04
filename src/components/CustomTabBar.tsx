@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     TouchableOpacity,
@@ -7,14 +7,18 @@ import {
     Image,
     Text,
     Alert,
+    Keyboard,
+    Platform,
 } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import {
     bottomHome,
     bottomTask,
     bottomAnalytics,
     bottomSettings,
+    bottomChat,
 } from '../assets/images';
 import { SCREENS } from '../constants/screens';
 import { COLORS } from '../constants/colors';
@@ -23,6 +27,22 @@ import { FONT_BODY } from '../constants/fonts';
 const { width } = Dimensions.get('window');
 
 const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
+    const insets = useSafeAreaInsets();
+    const isAndroid13OrAbove = Platform.OS === 'android' && (Platform.Version as number) >= 33;
+    const bottomInset = isAndroid13OrAbove ? insets.bottom : 0;
+    const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+    useEffect(() => {
+        const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+        const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+        const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+        const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, []);
+
     const selectedColor = COLORS.primary;
     const unselectedColor = '#9DB2CE';
 
@@ -32,8 +52,8 @@ const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => 
                 return bottomHome;
             case SCREENS.TASKS:
                 return bottomTask;
-            case SCREENS.ANALYTICS:
-                return bottomAnalytics;
+            case SCREENS.CHAT_LIST:
+                return bottomChat;
             case SCREENS.SETTINGS:
                 return bottomSettings;
             default:
@@ -47,8 +67,8 @@ const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => 
                 return 'Home';
             case SCREENS.TASKS:
                 return 'Tasks';
-            case SCREENS.ANALYTICS:
-                return 'Analytics';
+            case SCREENS.CHAT_LIST:
+                return 'Chat';
             case SCREENS.SETTINGS:
                 return 'Settings';
             default:
@@ -61,18 +81,22 @@ const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => 
         Alert.alert('Plus button pressed', 'Create new task action');
     };
 
+    if (keyboardVisible) {
+        return null;
+    }
+
     return (
-        <View style={styles.container}>
-            <View style={styles.svgContainer}>
-                <Svg width={width} height={110} viewBox={`0 0 ${width} 110`}>
+        <View style={[styles.container, { height: 80 + bottomInset }]}>
+            <View style={[styles.svgContainer, { height: 110 + bottomInset }]}>
+                <Svg width={width} height={110 + bottomInset} viewBox={`0 0 ${width} ${110 + bottomInset}`}>
                     <Path
-                        d={`M0 30 L${width / 2 - 48.99} 30 A 15 15 0 0 0 ${width / 2 - 35.63} 21.82 A 40 40 0 0 1 ${width / 2 + 35.63} 21.82 A 15 15 0 0 0 ${width / 2 + 48.99} 30 L${width} 30 L${width} 110 L0 110 Z`}
+                        d={`M0 30 L${width / 2 - 48.99} 30 A 15 15 0 0 0 ${width / 2 - 35.63} 21.82 A 40 40 0 0 1 ${width / 2 + 35.63} 21.82 A 15 15 0 0 0 ${width / 2 + 48.99} 30 L${width} 30 L${width} ${110 + bottomInset} L0 ${110 + bottomInset} Z`}
                         fill="#FFFFFF"
                     />
                 </Svg>
             </View>
 
-            <View style={styles.tabContent}>
+            <View style={[styles.tabContent, { paddingBottom: 10 + bottomInset }]}>
                 {state.routes.map((route, index) => {
                     if (route.name === 'PlusButton') {
                         return (

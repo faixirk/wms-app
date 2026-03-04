@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -11,55 +12,11 @@ import { taskTimer, noTaskImg, todayMeetImg, cameraImg, startTimerIcon, stopTime
 import { CutoutCard, FocusCard } from '../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SCREENS } from '../../constants/screens';
+import { useAppSelector } from '../../hooks';
+import request from '../../services/network/request';
+import ENDPOINTS from '../../constants/endpoints';
 
-const ACTIVE_TASKS = [
-    {
-        id: '1',
-        title: 'Wiring Dashboard Analytics',
-        dateText: '27 April',
-        statusBadgeConfig: {
-            label: 'In Progress',
-            backgroundColor: '#F2F4F7',
-            textColor: '#475467',
-            icon: <InprogressClockIcon width={12} height={12} fill="#475467" />
-        },
-        priorityBadgeConfig: {
-            label: 'High',
-            backgroundColor: '#F95555',
-            textColor: COLORS.white,
-            icon: <FlagHighIcon width={12} height={12} fill={COLORS.white} />
-        },
-        avatars: [
-            { uri: 'https://i.pravatar.cc/150?img=11' },
-            { uri: 'https://i.pravatar.cc/150?img=32' },
-            { uri: 'https://i.pravatar.cc/150?img=68' },
-        ],
-        extraAvatarsCount: 3,
-    },
-    {
-        id: '2',
-        title: 'Wiring Dashboard Analytics',
-        dateText: '27 April',
-        statusBadgeConfig: {
-            label: 'In Progress',
-            backgroundColor: '#F2F4F7',
-            textColor: '#475467',
-            icon: <InprogressClockIcon width={12} height={12} fill="#475467" />
-        },
-        priorityBadgeConfig: {
-            label: 'High',
-            backgroundColor: '#F95555',
-            textColor: COLORS.white,
-            icon: <FlagHighIcon width={12} height={12} fill={COLORS.white} />
-        },
-        avatars: [
-            { uri: 'https://i.pravatar.cc/150?img=11' },
-            { uri: 'https://i.pravatar.cc/150?img=32' },
-            { uri: 'https://i.pravatar.cc/150?img=68' },
-        ],
-        extraAvatarsCount: 3,
-    },
-];
+
 
 const ACTIVE_MEETINGS = [
     {
@@ -102,6 +59,45 @@ const EmptyStateCard = ({ imageSource, title, description }: { imageSource: any;
 
 const Home = ({ navigation }: any) => {
     const [isTimerExpanded, setIsTimerExpanded] = useState(false);
+    const [todayTasks, setTodayTasks] = useState<any[]>([]);
+    const [totalTasks, setTotalTasks] = useState(0);
+    const { selectedWorkspaceId, user } = useAppSelector((state) => state.auth);
+
+    const currentUserObj = user as any;
+    const userData = currentUserObj?.data;
+    const displayName = (userData?.username ?? userData?.name ?? currentUserObj?.username ?? currentUserObj?.name) as string | undefined;
+    const userAvatarUri = (userData?.avatar ?? currentUserObj?.avatar ?? (currentUserObj?.user as any)?.avatar) as string | undefined;
+    const headerInitial = displayName ? String(displayName).trim().charAt(0).toUpperCase() : 'U';
+
+    const fetchTodayTasks = async () => {
+        if (!selectedWorkspaceId) return;
+        try {
+            const response = await request<any>({
+                url: `${ENDPOINTS.TASKS_TODAY}?workspaceId=${selectedWorkspaceId}`,
+                method: 'GET',
+            });
+            const respData = response?.data;
+            // The API response wraps the payload in an additional 'data' object
+            const dataObj = respData?.data || respData;
+            const tasks = dataObj?.tasks;
+            if (tasks && Array.isArray(tasks)) {
+                setTodayTasks(tasks);
+                if (dataObj.totalTasks !== undefined) {
+                    setTotalTasks(dataObj.totalTasks);
+                } else {
+                    setTotalTasks(tasks.length);
+                }
+            }
+        } catch (error) {
+            console.log('Failed to fetch today tasks:', error);
+        }
+    };
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchTodayTasks();
+        }, [selectedWorkspaceId])
+    );
 
     const toggleTimer = (expand: boolean) => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -114,14 +110,20 @@ const Home = ({ navigation }: any) => {
 
                 {/* Header Profile Row */}
                 <View style={styles.headerRow}>
-                    <Image
-                        source={{ uri: 'https://i.pravatar.cc/150?img=47' }}
-                        style={styles.avatar}
-                    />
+                    {userAvatarUri ? (
+                        <Image
+                            source={{ uri: userAvatarUri }}
+                            style={styles.avatar}
+                        />
+                    ) : (
+                        <View style={styles.headerAvatarPlaceholder}>
+                            <Text style={styles.headerAvatarInitial}>{headerInitial}</Text>
+                        </View>
+                    )}
                     <View style={styles.headerIcons}>
-                        <TouchableOpacity style={styles.iconCircle} onPress={() => navigation?.navigate(SCREENS.CHAT_LIST)}>
+                        {/* <TouchableOpacity style={styles.iconCircle} onPress={() => navigation?.navigate(SCREENS.CHAT_LIST)}>
                             <ChatIcon width={20} height={20} />
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
                         <TouchableOpacity style={styles.iconCircle}>
                             <BellIcon width={20} height={20} />
                         </TouchableOpacity>
@@ -147,7 +149,7 @@ const Home = ({ navigation }: any) => {
                     >
                         <View style={styles.remainingTasksContent}>
                             <Text style={styles.remainingTasksTitle}>REMAINING TASKS</Text>
-                            <Text style={styles.remainingTasksCount}>0</Text>
+                            <Text style={styles.remainingTasksCount}>{totalTasks}</Text>
                         </View>
 
                         <TouchableOpacity style={styles.blackPillButton} activeOpacity={0.8}>
@@ -159,26 +161,60 @@ const Home = ({ navigation }: any) => {
                 {/* Today Task Section */}
                 <SectionHeader
                     title="TODAY TASK"
-                    badgeCount={ACTIVE_TASKS.length > 0 ? ACTIVE_TASKS.length : undefined}
+                    badgeCount={todayTasks.length > 0 ? todayTasks.length : undefined}
                     onSeeAllPress={() => navigation?.navigate(SCREENS.TODAYS_TASK)}
                 />
-                {ACTIVE_TASKS.length > 0 ? (
-                    ACTIVE_TASKS.map((task) => (
-                        <FocusCard
-                            key={task.id}
-                            title={task.title}
-                            dateText={task.dateText}
-                            statusBadgeConfig={task.statusBadgeConfig}
-                            priorityBadgeConfig={task.priorityBadgeConfig}
-                            avatars={task.avatars}
-                            extraAvatarsCount={task.extraAvatarsCount}
-                            actionNode={
-                                <TouchableOpacity style={styles.taskActionNode} activeOpacity={0.8}>
-                                    <LightningIcon width={16} height={16} />
-                                </TouchableOpacity>
-                            }
-                        />
-                    ))
+                {todayTasks.length > 0 ? (
+                    todayTasks.map((task: any) => {
+                        const dateText = task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) : 'No due date';
+
+                        const statusColor = task.workState?.color || '#F2F4F7';
+                        const isLightStatus = statusColor.toUpperCase() === '#F2F4F7' || statusColor.toUpperCase() === '#FFFFFF';
+
+                        const statusBadgeConfig = task.workState ? {
+                            label: task.workState.name,
+                            backgroundColor: statusColor,
+                            textColor: isLightStatus ? '#475467' : COLORS.white,
+                            icon: <InprogressClockIcon width={12} height={12} fill={isLightStatus ? '#475467' : COLORS.white} />
+                        } : undefined;
+
+                        let priorityBg = '#F2F4F7';
+                        let priorityText = '#475467';
+                        if (task.priority === 'urgent' || task.priority === 'high') {
+                            priorityBg = '#F95555';
+                            priorityText = COLORS.white;
+                        }
+
+                        const priorityBadgeConfig = task.priority ? {
+                            label: task.priority.charAt(0).toUpperCase() + task.priority.slice(1),
+                            backgroundColor: priorityBg,
+                            textColor: priorityText,
+                            icon: <FlagHighIcon width={12} height={12} fill={priorityText} />
+                        } : undefined;
+
+                        const avatars = task.assignees ? task.assignees.slice(0, 3).map((a: any) => ({
+                            uri: a.avatar,
+                            initial: a.username ? a.username.charAt(0).toUpperCase() : (a.email ? a.email.charAt(0).toUpperCase() : '?')
+                        })) : [];
+                        const extraAvatarsCount = task.assignees && task.assignees.length > 3 ? task.assignees.length - 3 : 0;
+
+                        return (
+                            <FocusCard
+                                key={task.id}
+                                title={task.name}
+                                dateText={dateText}
+                                statusBadgeConfig={statusBadgeConfig}
+                                priorityBadgeConfig={priorityBadgeConfig}
+                                avatars={avatars}
+                                extraAvatarsCount={extraAvatarsCount}
+                                actionNode={
+                                    <TouchableOpacity style={styles.taskActionNode} activeOpacity={0.8}>
+                                        <LightningIcon width={16} height={16} />
+                                    </TouchableOpacity>
+                                }
+                            />
+                        );
+                    })
                 ) : (
                     <EmptyStateCard
                         title="NO TASKS ASSIGNED"
@@ -191,10 +227,10 @@ const Home = ({ navigation }: any) => {
                 <View style={{ marginTop: 24 }}>
                     <SectionHeader
                         title="TODAY MEETING"
-                        badgeCount={ACTIVE_MEETINGS.length > 0 ? ACTIVE_MEETINGS.length : undefined}
+                        badgeCount={ACTIVE_MEETINGS.length === 0 ? ACTIVE_MEETINGS.length : undefined}
                         onSeeAllPress={() => navigation?.navigate(SCREENS.TODAYS_MEETINGS)}
                     />
-                    {ACTIVE_MEETINGS.length > 0 ? (
+                    {ACTIVE_MEETINGS.length === 0 ? (
                         ACTIVE_MEETINGS.map((meet) => (
                             <FocusCard
                                 key={meet.id}
@@ -227,7 +263,7 @@ const Home = ({ navigation }: any) => {
             </ScrollView>
 
             {/* Floating Timer Button Wrapper */}
-            <View style={[styles.timerWrapper, isTimerExpanded && styles.timerWrapperExpanded]}>
+            {/* <View style={[styles.timerWrapper, isTimerExpanded && styles.timerWrapperExpanded]}>
                 <TouchableOpacity
                     style={[styles.timerFab, isTimerExpanded && styles.timerFabExpanded]}
                     activeOpacity={isTimerExpanded ? 1 : 0.9}
@@ -262,7 +298,7 @@ const Home = ({ navigation }: any) => {
                         <Image source={taskTimer} style={styles.timerIcon} resizeMode="contain" />
                     )}
                 </TouchableOpacity>
-            </View>
+            </View> */}
         </SafeAreaView>
     );
 };
@@ -287,6 +323,20 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 24,
+    },
+    headerAvatarPlaceholder: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: COLORS.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerAvatarInitial: {
+        fontFamily: FONT_BODY,
+        fontSize: 20,
+        fontWeight: '700',
+        color: COLORS.white,
     },
     headerIcons: {
         flexDirection: 'row',

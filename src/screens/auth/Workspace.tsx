@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { addImg, appLogo } from '../../assets/images';
 import { COLORS } from '../../constants/colors';
-import { FONT_HEADING } from '../../constants/fonts';
+import { FONT_BODY, FONT_HEADING } from '../../constants/fonts';
 import { ArrowUpRightIcon } from '../../assets/svgs';
 import { SCREENS } from '../../constants/screens';
 import Button from '../../components/Button';
@@ -76,10 +76,9 @@ const WorkspaceScreen = () => {
 
     const renderWorkspaceItem = ({ item, index }: { item: WorkspaceData, index: number }) => {
         const isSelected = item.id === selectedId;
-        const isFirst = index === 0;
 
-        // Alternating colors between purple and red based on index as seen in design
-        const bgColor = isFirst ? '#6964F8' : '#FA5A5A';
+        const cardColors = ['#6964F8', '#FA5A5A', '#FFB038', '#20B2AA']; // Array of 4 distinct colors
+        const bgColor = cardColors[index % cardColors.length];
 
         return (
             <TouchableOpacity
@@ -103,14 +102,7 @@ const WorkspaceScreen = () => {
                     <View style={styles.cardContent}>
                         <Text style={styles.iconEmoji}>🏢</Text>
 
-                        {isFirst ? (
-                            <Text style={styles.cardTitle}>{item.name}</Text>
-                        ) : (
-                            <View style={styles.splitTextRow}>
-                                <Text style={styles.cardTitle}>NEXTBYTE</Text>
-                                <Text style={styles.cardSubtitle}> LTD PVT</Text>
-                            </View>
-                        )}
+                        <Text style={styles.cardTitle}>{item.name}</Text>
                     </View>
                 </CutoutCard>
 
@@ -242,7 +234,7 @@ const styles = StyleSheet.create({
     },
     cardTitle: {
         fontFamily: FONT_HEADING,
-        fontSize: 32,
+        fontSize: 24,
         color: COLORS.white,
         letterSpacing: -1,
     },

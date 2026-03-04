@@ -21,6 +21,9 @@ const ENDPOINTS = {
   // S3 Upload APIs
   PRESIGNED_URL: '/s3/presignedurl',
   DIRECT_UPLOAD: '/s3/upload',
+
+  // Task APIs
+  TASKS_TODAY: '/tasks/today',
 };
 
 export default ENDPOINTS;

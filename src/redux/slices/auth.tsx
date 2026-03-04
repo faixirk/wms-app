@@ -11,6 +11,14 @@ export interface AuthUser {
   [key: string]: unknown;
 }
 
+/** Time-based greeting for UI (e.g. ChatList header). */
+export function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 export interface AuthState {
   user: AuthUser | null;
   token: string | null;
@@ -28,6 +36,8 @@ export interface AuthState {
   resetPasswordError: string | null;
   /** Token from forgot-password response; used for verify-otp. Replaced by token from verify-otp for reset-password. */
   passwordResetFlowToken: string | null;
+  /** Greeting for header (e.g. "Good morning"). Set on login / app open. */
+  greeting: string | null;
 }
 
 const initialState: AuthState = {
@@ -46,6 +56,7 @@ const initialState: AuthState = {
   resetPasswordLoading: false,
   resetPasswordError: null,
   passwordResetFlowToken: null,
+  greeting: null,
 };
 
 /** API error: message can be string or nested { message, error, statusCode } */
@@ -224,12 +235,14 @@ const authSlice = createSlice({
       state.token = token ?? null;
       state.isAuthenticated = true;
       state.error = null;
+      state.greeting = getGreeting();
     },
     logout: (state) => {
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
       state.error = null;
+      state.greeting = null;
     },
     setIsFirstLaunch: (state, action: PayloadAction<boolean>) => {
       state.isFirstLaunch = action.payload;
@@ -257,6 +270,9 @@ const authSlice = createSlice({
       if (action.payload.workspaceId) {
         state.selectedWorkspaceId = action.payload.workspaceId;
       }
+    },
+    setGreeting: (state) => {
+      state.greeting = getGreeting();
     },
   },
   extraReducers: (builder) => {
@@ -331,6 +347,7 @@ export const {
   clearResetPasswordError,
   clearPasswordResetFlowToken,
   setHasSelectedWorkspace,
+  setGreeting,
 } = authSlice.actions;
 
 export default authSlice.reducer;

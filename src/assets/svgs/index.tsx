@@ -15,6 +15,8 @@ export { default as VideoCamIcon } from './video_cam.svg';
 export { default as ArrowLeftIcon } from './arrow_left.svg';
 export { default as ClockWhiteIcon } from './clock_white.svg';
 export { default as SearchIcon } from './search.svg';
+export { default as SearchWhiteIcon } from './search_white.svg';
+export { default as PlusWhiteIcon } from './plus_white.svg';
 export { default as SendIcon } from './send.svg';
 export { default as MicIcon } from './mic.svg';
 export { default as PaperclipIcon } from './paperclip.svg';

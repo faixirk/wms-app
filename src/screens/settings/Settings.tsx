@@ -1,10 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
+import { COLORS } from '../../constants/colors';
+import { FONT_HEADING } from '../../constants/fonts';
+import { emptyChatImg } from '../../assets/images';
 
 const Settings = () => {
     return (
         <View style={styles.container}>
-            <Text style={styles.text}>Settings Screen</Text>
+            <View style={styles.emptyStateContainer}>
+                <Image source={emptyChatImg} style={styles.emptyStateImage} resizeMode="contain" />
+                <Text style={styles.emptyStateText}>YOU DONT HAVE ANY SETTINGS TO PREVIEW</Text>
+            </View>
         </View>
     );
 };
@@ -12,13 +18,25 @@ const Settings = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.background,
     },
-    text: {
-        fontSize: 18,
-        color: '#000',
+    emptyStateContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: 40,
+    },
+    emptyStateImage: {
+        width: 300,
+        height: 200,
+        marginBottom: 10,
+    },
+    emptyStateText: {
+        fontFamily: FONT_HEADING,
+        fontSize: 14,
+        color: "#5A5A5A",
+        textAlign: 'center',
+        textTransform: 'uppercase',
     },
 });
 

@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleProp,
   ViewStyle,
+  StatusBar,
 } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { FONT_BODY, FONT_HEADING } from '../constants/fonts';
@@ -44,6 +45,7 @@ const StatusModal = ({
       onRequestClose={onClose}
     >
       <Pressable style={styles.overlay} onPress={onClose}>
+        {visible && <StatusBar hidden={true} />}
         <Pressable style={[styles.card, style]} onPress={(e) => e.stopPropagation()}>
           <View style={[styles.iconWrap, { backgroundColor: accentColor + '20' }]}>
             {isError ? (

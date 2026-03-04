@@ -10,6 +10,7 @@ import {
   Animated,
   useWindowDimensions,
   Keyboard,
+  StatusBar,
 } from 'react-native';
 
 export interface ModalSheetProps {
@@ -23,6 +24,7 @@ export interface ModalSheetProps {
   dismissOnOverlayPress?: boolean;
   /** Height as fraction of screen (0–1). Default 0.7 = ~70% */
   heightFraction?: number;
+  customSheetInner?: StyleProp<ViewStyle>;
 }
 
 const HEADER_STRIP_HEIGHT = 48;
@@ -35,6 +37,7 @@ const ModalSheet = ({
   contentStyle,
   dismissOnOverlayPress = true,
   heightFraction = 0.7,
+  customSheetInner,
 }: ModalSheetProps) => {
   const { height: windowHeight } = useWindowDimensions();
   const sheetHeight = windowHeight * heightFraction;
@@ -80,7 +83,7 @@ const ModalSheet = ({
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (e) => {
       Animated.timing(keyboardOffset, {
-        toValue: e.endCoordinates.height,
+        toValue: Platform.OS === 'ios' ? e.endCoordinates.height : 0,
         duration: Platform.OS === 'ios' ? e.duration : 250,
         useNativeDriver: true,
       }).start();
@@ -108,6 +111,7 @@ const ModalSheet = ({
       onRequestClose={onClose}
     >
       <View style={StyleSheet.absoluteFill}>
+        {visible && <StatusBar hidden={true} />}
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
@@ -136,7 +140,7 @@ const ModalSheet = ({
           {header ? (
             <View style={styles.headerStrip}>{header}</View>
           ) : null}
-          <Pressable style={styles.sheetInner} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={[styles.sheetInner, customSheetInner]} onPress={(e) => e.stopPropagation()}>
             {children}
           </Pressable>
         </Animated.View>

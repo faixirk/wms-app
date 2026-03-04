@@ -1,17 +1,31 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, Tasks, Analytics, Settings } from '..';
+import { Home, Tasks, Analytics, Settings, ChatList } from '..';
 import { SCREENS } from '../constants/screens';
 import { CustomTabBar } from '../components';
+import { useNavigationMode } from '../utils/useNavigationBarVisibility';
 
 const Tab = createBottomTabNavigator();
 
 const BottomTabNavigator = () => {
+    const navigationMode = useNavigationMode();
+
+    const baseTabBarStyle = useMemo(
+        () => [
+            {
+                marginBottom:
+                    navigationMode === 'button' ? '6%' : ('2%' as `${number}%`),
+            },
+        ],
+        [navigationMode],
+    );
+
     return (
         <Tab.Navigator
             tabBar={(props) => <CustomTabBar {...props} />}
             screenOptions={{
                 headerShown: false,
+                tabBarStyle: baseTabBarStyle,
             }}>
             <Tab.Screen name={SCREENS.HOME} component={Home} />
             <Tab.Screen name={SCREENS.TASKS} component={Tasks} />
@@ -28,7 +42,7 @@ const BottomTabNavigator = () => {
                     },
                 }}
             />
-            <Tab.Screen name={SCREENS.ANALYTICS} component={Analytics} />
+            <Tab.Screen name={SCREENS.CHAT_LIST} component={ChatList} />
             <Tab.Screen name={SCREENS.SETTINGS} component={Settings} />
         </Tab.Navigator>
     );

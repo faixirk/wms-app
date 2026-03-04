@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     View, Text, StyleSheet, ImageBackground, Image, TouchableOpacity, TextInput,
-    FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, PermissionsAndroid,
-    Modal, Linking, Dimensions, Animated
+    FlatList, KeyboardAvoidingView, Keyboard, Platform, ActivityIndicator, Alert, PermissionsAndroid,
+    Modal, Linking, Dimensions, Animated, ScrollView
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import DocumentPicker from 'react-native-document-picker';
-import { ArrowWhiteLeftIcon, CalenderBlueIcon, ChatVideoCamIcon, SendPaperplaneIcon, MicIcon, AttachmentIcon, PlayButtonIcon, StopIcon, PauseIcon, CloseIcon, PhoneIcon, CallIcon } from '../../assets/svgs';
-import { chatScreenBg } from '../../assets/images';
+import { ArrowWhiteLeftIcon, CalenderBlueIcon, ChatVideoCamIcon, SendPaperplaneIcon, MicIcon, AttachmentIcon, PlayButtonIcon, StopIcon, PauseIcon, CloseIcon, PhoneIcon, CallIcon, ArrowLeftIcon, FlagHighIcon, BellIcon, EmailIcon } from '../../assets/svgs';
+import { chatScreenBg, newGroupLogo } from '../../assets/images';
 import { COLORS } from '../../constants/colors';
 import { FONT_HEADING, FONT_BODY } from '../../constants/fonts';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { fetchChatList, fetchChatMessages, ApiMessage, addMessageToRoom } from '../../redux/slices/chat';
 import { socketService } from '../../services/network/socket';
@@ -18,6 +18,7 @@ import { uploadFile } from '../../services/network/upload';
 import { useSound } from 'react-native-nitro-sound';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useCall } from '../../context/CallContext';
+import Svg, { Path } from 'react-native-svg';
 
 const WAVEFORM_BAR_COUNT = 15;
 
@@ -213,6 +214,7 @@ const ChatRoom = () => {
     const navigation = useNavigation();
     const route = useRoute<any>();
     const dispatch = useAppDispatch();
+    const insets = useSafeAreaInsets();
 
     // Fallback ID if not provided, though it typically should be
     const chatId = route.params?.chatId;
@@ -226,6 +228,23 @@ const ChatRoom = () => {
     const [pendingAttachment, setPendingAttachment] = useState<{ uri: string; name: string; type: string; size?: number } | null>(null);
     const [expandedMessageIds, setExpandedMessageIds] = useState<Record<string, boolean>>({});
     const [callOptionsVisible, setCallOptionsVisible] = useState(false);
+    const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
+
+    // Info Sheet Tabs state
+    const [infoActiveTab, setInfoActiveTab] = useState<'Members' | 'Files' | 'Media' | 'Links'>('Members');
+    const [inAppNotifEnabled, setInAppNotifEnabled] = useState(true);
+    const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(false);
+
+    // Typing state
+    const [typingUsers, setTypingUsers] = useState<Record<string, ReturnType<typeof setTimeout>>>({});
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isTypingRef = useRef<boolean>(false);
+
+    // Message Status Tracking
+    const [messageStatuses, setMessageStatuses] = useState<Record<string, string>>({});
+
+    // Dynamic Keyboard Height
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
 
     const { startRecorder, stopRecorder } = useSound({
         onRecord: (e) => setRecordTime(e.currentPosition)
@@ -233,23 +252,59 @@ const ChatRoom = () => {
 
     // Store mapping
     const { user, selectedWorkspaceId } = useAppSelector(state => state.auth);
-    const { activeRoomMessages, loadingMessages, chats, onlineStatuses } = useAppSelector(state => state.chat);
+    const { chats, activeRoomMessages, loadingMessages, onlineStatuses } = useAppSelector(state => state.chat);
 
-    const messages = activeRoomMessages[chatId] || [];
-    const isLoading = loadingMessages[chatId] || false;
-    const flatListRef = useRef<FlatList>(null);
     const userId = user?.id || (user?.data as any)?.id; // Resolving specific backend response nesting
 
+    const currentChat = useMemo(() => chats.find(c => c.id === chatId), [chats, chatId]);
+    const isGroup = currentChat ? currentChat.type !== 'DIRECT' : false;
+
+    useEffect(() => {
+        if (!isGroup && infoActiveTab === 'Members') {
+            setInfoActiveTab('Files');
+        }
+    }, [isGroup, infoActiveTab]);
+
+    const messages = activeRoomMessages[chatId] || [];
+    const isLoading = loadingMessages ? (loadingMessages[chatId] || false) : false;
+    const flatListRef = useRef<FlatList>(null);
+
     // Resolve Chat Details (for header avatar/name)
-    const currentChat = chats.find(c => c.id === chatId);
-    const otherParticipant = currentChat?.participants?.find((p: any) => p.id !== userId) || currentChat?.participants?.[0];
-    const headerNameFull = otherParticipant?.username || otherParticipant?.name || currentChat?.title || currentChat?.name || 'Chat';
-    const headerName = (headerNameFull || '').trim().split(/\s+/)[0] || headerNameFull;
-    const headerAvatarUri = currentChat?.avatar || otherParticipant?.avatar;
+    const otherParticipant = useMemo(() => {
+        if (isGroup) return undefined;
+        return currentChat?.participants?.find((p: any) => p.id !== userId) || currentChat?.participants?.[0];
+    }, [isGroup, currentChat, userId]);
+
+    // Set Header Name
+    const headerNameFull = isGroup
+        ? (currentChat?.name || currentChat?.title || 'Group Chat')
+        : (otherParticipant?.username || otherParticipant?.name || currentChat?.title || currentChat?.name || 'Chat');
+
+    const headerName = isGroup ? headerNameFull : ((headerNameFull || '').trim().split(/\s+/)[0] || headerNameFull);
+
+    // Set Header Avatar
+    const headerAvatarUri = isGroup ? currentChat?.avatar : (currentChat?.avatar || otherParticipant?.avatar);
     const showHeaderAvatarImage = !!headerAvatarUri;
     const headerAvatarInitial = (headerName || '?').trim().charAt(0).toUpperCase() || '?';
+
+    // Set Header Status
     const otherUserId = otherParticipant?.id;
     const isOnline = otherUserId && onlineStatuses[otherUserId]?.status === 'online';
+
+    // Calculate online participants for group
+    let onlineCount = 0;
+    if (isGroup && currentChat?.participants) {
+        // Include the current user if they are online (which they usually are if they are looking at the screen)
+        // Check onlineStatuses for each participant
+        currentChat.participants.forEach(p => {
+            // we assume the current user is online or we check their status too
+            if (p.id === userId || onlineStatuses[p.id]?.status === 'online') {
+                onlineCount++;
+            }
+        });
+    }
+
+    const headerStatusText = isGroup ? `${onlineCount} online` : (isOnline ? 'Online' : 'Offline');
 
     useEffect(() => {
         if (!chatId || !selectedWorkspaceId) return;
@@ -267,27 +322,170 @@ const ChatRoom = () => {
 
                 // Hacky soft auto-scroll
                 setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+
+                // If a new message arrives from someone, they probably stopped typing
+                const newSenderId = data.message.senderId || data.message.sender?.id;
+                if (newSenderId) {
+                    setTypingUsers(prev => {
+                        if (!prev[newSenderId]) return prev;
+                        const newPrev = { ...prev };
+                        clearTimeout(newPrev[newSenderId]);
+                        delete newPrev[newSenderId];
+                        return newPrev;
+                    });
+                }
+
+                // If we get a new message from someone else while in the room, mark as read
+                if (newSenderId !== userId) {
+                    markRoomAsRead();
+                }
             }
         };
         socketService.on('chat:message:new', handleNewMessage);
 
+        // Subscribe to typing indicator
+        const handleTyping = (data: { chatId: string, userId: string, isTyping: boolean }) => {
+            if (data.chatId !== chatId) return;
+            if (data.userId === userId) return; // ignore our own
+
+            setTypingUsers(prev => {
+                const newPrev = { ...prev };
+                if (data.isTyping) {
+                    // clear existing timeout if they're already typing
+                    if (newPrev[data.userId]) {
+                        clearTimeout(newPrev[data.userId]);
+                    }
+                    // set a new timeout to clear them out after 3 seconds forcefully
+                    newPrev[data.userId] = setTimeout(() => {
+                        setTypingUsers(current => {
+                            const updated = { ...current };
+                            delete updated[data.userId];
+                            return updated;
+                        });
+                    }, 3000);
+                } else {
+                    if (newPrev[data.userId]) {
+                        clearTimeout(newPrev[data.userId]);
+                        delete newPrev[data.userId];
+                    }
+                }
+                return newPrev;
+            });
+        };
+        socketService.on('chat:typing', handleTyping);
+
+        // Subscribe to message status events
+        const handleAck = (data: { chatId: string, messageId: string, clientMessageId?: string }) => {
+            if (data.chatId === chatId) {
+                setMessageStatuses(prev => ({
+                    ...prev,
+                    [data.messageId || data.clientMessageId || '']: 'sent'
+                }));
+            }
+        };
+
+        const handleDelivered = (data: { chatId: string, messageId: string }) => {
+            if (data.chatId === chatId) {
+                setMessageStatuses(prev => ({
+                    ...prev,
+                    [data.messageId]: 'delivered'
+                }));
+            }
+        };
+
+        const handleRead = (data: { chatId: string, userId: string }) => {
+            if (data.chatId === chatId && data.userId !== userId) {
+                setMessageStatuses(prev => {
+                    const next = { ...prev };
+                    Object.keys(next).forEach(key => {
+                        if (next[key] === 'sent' || next[key] === 'delivered') {
+                            next[key] = 'read';
+                        }
+                    });
+                    return next;
+                });
+            }
+        };
+
+        socketService.on('chat:message:ack', handleAck);
+        socketService.on('chat:message:delivered', handleDelivered);
+        socketService.on('chat:read', handleRead);
+
+        // Initial Read Trigger
+        const markRoomAsRead = () => {
+            socketService.emit('chat:read', {
+                chatId,
+                workspaceId: selectedWorkspaceId
+            });
+        };
+
+        // Trigger read when joining
+        markRoomAsRead();
+
+        const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+        const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+        const keyboardShowListener = Keyboard.addListener(showEvent, (e) => {
+            setKeyboardHeight(e.endCoordinates.height);
+        });
+        const keyboardHideListener = Keyboard.addListener(hideEvent, () => {
+            setKeyboardHeight(0);
+        });
+
         return () => {
             socketService.emit('chat:leave', { chatId });
             socketService.off('chat:message:new', handleNewMessage);
+            socketService.off('chat:typing', handleTyping);
+            socketService.off('chat:message:ack', handleAck);
+            socketService.off('chat:message:delivered', handleDelivered);
+            socketService.off('chat:read', handleRead);
+            keyboardShowListener.remove();
+            keyboardHideListener.remove();
         };
     }, [chatId, selectedWorkspaceId, dispatch]);
+
+    const emitTypingState = (isTyping: boolean) => {
+        if (isTypingRef.current !== isTyping) {
+            isTypingRef.current = isTyping;
+            socketService.emit('chat:typing', {
+                chatId,
+                workspaceId: selectedWorkspaceId,
+                isTyping
+            });
+        }
+    };
+
+    const handleMessageChange = (text: string) => {
+        setMessage(text);
+        if (text.length > 0) {
+            emitTypingState(true);
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => {
+                emitTypingState(false);
+            }, 3000);
+        } else {
+            // Emptied input
+            emitTypingState(false);
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        }
+    };
 
     const handleSendMessage = () => {
         if (!message.trim() && !uploading) return;
 
+        const clientMsgId = Date.now().toString();
+
+        // Optimistically track sending state
+        setMessageStatuses(prev => ({ ...prev, [clientMsgId]: 'sending' }));
+
         socketService.emit('chat:message:send', {
             chatId,
             content: message.trim(),
-            clientMessageId: Date.now().toString(), // basic deduplication tracking ID
+            clientMessageId: clientMsgId,
         });
 
-        // Optimistically add to list internally? Backend should emit `chat:message:ack` and `chat:message:new`
-        // We'll rely on the server roundtrip for simplicity as per standard specs unless UI demands immediate
+        // Cancel typing status abruptly
+        emitTypingState(false);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
         setMessage('');
     };
@@ -452,10 +650,43 @@ const ChatRoom = () => {
 
         const msgTime = new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+        // Resolve sender for received messages
+        let senderAvatar = null;
+        let senderInitial = '?';
+
+        if (!isSent) {
+            // First check item.sender (if backend populates it)
+            if (item.sender?.avatar) {
+                senderAvatar = item.sender.avatar;
+            } else if (isGroup && item.senderId && currentChat?.participants) {
+                // Determine sender from participants list
+                const participant = currentChat.participants.find(p => p.id === item.senderId);
+                if (participant?.avatar) {
+                    senderAvatar = participant.avatar;
+                } else if (participant?.username || participant?.name) {
+                    senderInitial = (participant.username || participant.name || '?').trim().charAt(0).toUpperCase();
+                }
+            } else if (otherParticipant) {
+                // Fallback for direct chat or unknown backend
+                senderAvatar = otherParticipant.avatar;
+                senderInitial = (otherParticipant.username || otherParticipant.name || '?').trim().charAt(0).toUpperCase();
+            } else if (item.sender?.username || item.sender?.name) {
+                senderInitial = (item.sender.username || item.sender.name || '?').trim().charAt(0).toUpperCase();
+            }
+        }
+
         return (
             <View style={[styles.messageRow, isSent ? styles.messageRowRight : styles.messageRowLeft]}>
                 {!isSent && (
-                    <Image source={{ uri: otherParticipant?.avatar || 'https://i.pravatar.cc/150' }} style={styles.avatarSmall} />
+                    senderAvatar ? (
+                        <Image source={{ uri: senderAvatar }} style={styles.avatarSmall} />
+                    ) : (
+                        <View style={styles.avatarSmallPlaceholder}>
+                            <Text style={styles.avatarSmallInitial}>
+                                {senderInitial}
+                            </Text>
+                        </View>
+                    )
                 )}
 
                 <View style={[
@@ -519,24 +750,244 @@ const ChatRoom = () => {
                         );
                     })()}
 
-                    <Text style={{
-                        fontSize: 10,
-                        color: isSent ? '#5A5A5A' : 'rgba(255,255,255,0.7)',
-                        alignSelf: 'flex-end',
-                        marginTop: 4
-                    }}>
-                        {msgTime}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 4 }}>
+                        <Text style={{
+                            fontSize: 10,
+                            color: isSent ? '#5A5A5A' : 'rgba(255,255,255,0.7)',
+                            marginRight: isSent ? 4 : 0
+                        }}>
+                            {msgTime}
+                        </Text>
+
+                        {isSent && (() => {
+                            // Backend might have `status` natively, fallback to `messageStatuses` tracker, or default to `sent`
+                            const status = messageStatuses[item.id] || (item as any).status || 'sent';
+
+                            let icon = <Text style={{ fontSize: 10, color: '#8E8E93', fontWeight: 'bold' }}>✓</Text>;
+
+                            if (status === 'read') {
+                                icon = <Text style={{ fontSize: 10, color: '#1366D9', fontWeight: 'bold' }}>✓✓</Text>;
+                            } else if (status === 'delivered') {
+                                icon = <Text style={{ fontSize: 10, color: '#8E8E93', fontWeight: 'bold' }}>✓✓</Text>;
+                            } else if (status === 'sending') {
+                                icon = <ActivityIndicator size="small" color="#8E8E93" style={{ transform: [{ scale: 0.5 }] }} />;
+                            }
+
+                            return icon;
+                        })()}
+                    </View>
                 </View>
             </View>
         );
     };
 
+    // --- Dynamic Chat Info Extractors ---
+    const { actualFiles, actualMedia, actualLinks } = useMemo(() => {
+        const files: { id: string, name: string, meta: string, url: string, date: string, mime: string }[] = [];
+        const media: { id: string, name: string, meta: string, url: string, date: string, mime: string, duration?: number }[] = [];
+        const links: { id: string, url: string, title: string, date: string }[] = [];
+
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+
+        [...messages].reverse().forEach(msg => {
+            const dateStr = new Date(msg.createdAt).toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' });
+
+            // 1. Extract embedded links from content
+            if (msg.content) {
+                let match;
+                while ((match = urlRegex.exec(msg.content)) !== null) {
+                    const matchedUrl = match[1];
+                    // Very basic title fallback: just show the domain or truncated url
+                    let title = matchedUrl;
+                    try { title = new URL(matchedUrl).hostname; } catch (e) { }
+
+                    // De-duplicate same link in same message
+                    if (!links.some(l => l.url === matchedUrl)) {
+                        links.push({ id: `${msg.id}-${links.length}`, url: matchedUrl, title, date: dateStr });
+                    }
+                }
+            }
+
+            // 2. Extract attachments
+            if (msg.attachments && msg.attachments.length > 0) {
+                msg.attachments.forEach((att: any, index: number) => {
+                    if (!att.url) return;
+
+                    const mime = att.mimeType || '';
+                    const sizeText = att.size ? `${(att.size / 1024 / 1024).toFixed(1)} MB` : 'Unknown Size';
+                    const name = att.name || 'document.file';
+
+                    if (mime.includes('image') || mime.includes('audio') || mime.includes('video')) {
+                        let typeStr = 'Media';
+                        if (mime.includes('image')) typeStr = 'Image';
+                        if (mime.includes('audio')) typeStr = 'Audio';
+                        if (mime.includes('video')) typeStr = 'Video';
+
+                        media.push({
+                            id: `${msg.id}-att-${index}`,
+                            name,
+                            url: att.url,
+                            mime,
+                            date: dateStr,
+                            duration: att.duration,
+                            meta: `${typeStr} • ${att.duration ? 'Audio' : sizeText} • ${dateStr}`
+                        });
+                    } else {
+                        files.push({
+                            id: `${msg.id}-att-${index}`,
+                            name,
+                            url: att.url,
+                            mime,
+                            date: dateStr,
+                            meta: `File • ${sizeText} • ${dateStr}`
+                        });
+                    }
+                });
+            }
+        });
+
+        return { actualFiles: files, actualMedia: media, actualLinks: links };
+    }, [messages]);
+
+    const renderInfoSheetTabs = () => {
+        const tabs = isGroup ? ['Members', 'Files', 'Media', 'Links'] as const : ['Files', 'Media', 'Links'] as const;
+        return (
+            <View style={styles.infoTabsWrapper}>
+                {tabs.map(tab => (
+                    <TouchableOpacity
+                        key={tab}
+                        style={[styles.infoTabButton, infoActiveTab === tab && styles.infoTabButtonActive]}
+                        onPress={() => setInfoActiveTab(tab as any)}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={[styles.infoTabText, infoActiveTab === tab && styles.infoTabTextActive]}>
+                            {tab}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+        );
+    };
+
+    const renderRealFiles = () => {
+        if (infoActiveTab === 'Files') {
+            if (actualFiles.length === 0) {
+                return (
+                    <View style={{ padding: 20, alignItems: 'center' }}>
+                        <Text style={{ fontFamily: FONT_BODY, color: 'rgba(0,0,0,0.4)' }}>No files available in this chat.</Text>
+                    </View>
+                );
+            }
+            return (
+                <View style={styles.mockFilesContainer}>
+                    {actualFiles.map(file => (
+                        <TouchableOpacity key={file.id} style={styles.mockFileItem} activeOpacity={0.7} onPress={() => handleOpenAttachment(file)}>
+                            <View style={styles.mockFileIcon}>
+                                <AttachmentIcon width={20} height={20} color={COLORS.black} />
+                            </View>
+                            <View style={styles.mockFileDetails}>
+                                <Text style={styles.mockFileName} numberOfLines={1}>{file.name}</Text>
+                                <Text style={styles.mockFileMeta}>{file.meta}</Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            );
+        }
+
+        if (infoActiveTab === 'Media') {
+            if (actualMedia.length === 0) {
+                return (
+                    <View style={{ padding: 20, alignItems: 'center' }}>
+                        <Text style={{ fontFamily: FONT_BODY, color: 'rgba(0,0,0,0.4)' }}>No media available in this chat.</Text>
+                    </View>
+                );
+            }
+            return (
+                <View style={styles.mockFilesContainer}>
+                    {actualMedia.map(media => (
+                        <TouchableOpacity key={media.id} style={styles.mockFileItem} activeOpacity={0.7} onPress={() => handleOpenAttachment(media)}>
+                            <View style={styles.mockFileIcon}>
+                                {media.mime.includes('audio') ? (
+                                    <MicIcon width={20} height={20} color={COLORS.black} />
+                                ) : media.mime.includes('video') ? (
+                                    <ChatVideoCamIcon width={20} height={20} color={COLORS.black} />
+                                ) : (
+                                    <Image source={{ uri: media.url }} style={{ width: 44, height: 44, borderRadius: 12 }} />
+                                )}
+                            </View>
+                            <View style={styles.mockFileDetails}>
+                                <Text style={styles.mockFileName} numberOfLines={1}>{media.name}</Text>
+                                <Text style={styles.mockFileMeta}>{media.meta}</Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            );
+        }
+
+        if (infoActiveTab === 'Links') {
+            if (actualLinks.length === 0) {
+                return (
+                    <View style={{ padding: 20, alignItems: 'center' }}>
+                        <Text style={{ fontFamily: FONT_BODY, color: 'rgba(0,0,0,0.4)' }}>No links available in this chat.</Text>
+                    </View>
+                );
+            }
+            return (
+                <View style={styles.mockFilesContainer}>
+                    {actualLinks.map(link => (
+                        <TouchableOpacity key={link.id} style={styles.mockFileItem} activeOpacity={0.7} onPress={() => Linking.openURL(link.url)}>
+                            <View style={styles.mockFileIcon}>
+                                <Text style={{ fontFamily: FONT_HEADING, fontSize: 16, color: COLORS.black }}>🔗</Text>
+                            </View>
+                            <View style={styles.mockFileDetails}>
+                                <Text style={styles.mockFileName} numberOfLines={1}>{link.title}</Text>
+                                <Text style={styles.mockFileMeta}>{link.url.length > 30 ? link.url.substring(0, 30) + '...' : link.url} • {link.date}</Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            );
+        }
+
+        return null;
+    };
+
     const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+    const renderTypingIndicator = () => {
+        const typingIds = Object.keys(typingUsers);
+        if (typingIds.length === 0) return null;
+
+        let typingText = 'typing...';
+
+        if (isGroup && currentChat?.participants) {
+            const typingNames = typingIds.map(id => {
+                const participant = currentChat.participants.find(p => p.id === id);
+                const fullName = participant?.username || participant?.name || 'Unknown User';
+                return fullName.trim().split(/\s+/)[0];
+            }).filter(Boolean);
+
+            if (typingNames.length === 1) {
+                typingText = `${typingNames[0]} is typing...`;
+            } else if (typingNames.length === 2) {
+                typingText = `${typingNames[0]} and ${typingNames[1]} are typing...`;
+            } else if (typingNames.length > 2) {
+                typingText = `Multiple people are typing...`;
+            }
+        }
+
+        return (
+            <View style={styles.typingIndicatorContainer}>
+                <Text style={styles.typingIndicatorText}>{typingText}</Text>
+            </View>
+        );
+    };
 
     return (
         <SafeAreaView style={styles.safeArea}>
-            <ImageBackground source={chatScreenBg} style={styles.background} resizeMode="cover">
+            <View style={styles.background}>
 
                 {/* Full-screen image preview modal */}
                 <Modal
@@ -619,6 +1070,90 @@ const ChatRoom = () => {
                     </View>
                 </Modal>
 
+                {/* Chat Info Full Screen Modal */}
+                <Modal visible={isInfoModalVisible} animationType="slide" onRequestClose={() => setIsInfoModalVisible(false)}>
+                    <View style={[styles.lightModalSafeArea, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+                        <View style={styles.lightModalContainer}>
+                            <View style={styles.lightModalTopBar}>
+                                <TouchableOpacity onPress={() => setIsInfoModalVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                                    <CloseIcon width={24} height={24} color="#000" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <ScrollView style={styles.lightModalScroll} contentContainerStyle={styles.lightModalScrollContent} showsVerticalScrollIndicator={false}>
+                                <View style={styles.infoSheetHeader}>
+                                    {isGroup ? (
+                                        <Image source={newGroupLogo} style={[styles.infoLargeAvatarImage, { alignSelf: 'center', marginBottom: 20 }]} />
+                                    ) : (
+                                        <View style={styles.infoLargeAvatarWrapper}>
+                                            {showHeaderAvatarImage ? (
+                                                <Image source={{ uri: headerAvatarUri }} style={styles.infoLargeAvatarImage} />
+                                            ) : (
+                                                <View style={[styles.infoLargeAvatarImage, styles.infoLargeAvatarPlaceholder]}>
+                                                    <Text style={styles.infoLargeAvatarText}>{headerAvatarInitial}</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    )}
+
+                                    <Text style={styles.infoNameText}>{headerNameFull}</Text>
+
+                                    {isGroup && (
+                                        <View style={styles.infoMembersBadge}>
+                                            <Text style={styles.infoMembersBadgeText}>{currentChat?.participants?.length || 0} members</Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                {renderInfoSheetTabs()}
+
+                                {infoActiveTab === 'Members' && isGroup && currentChat?.participants && currentChat.participants.length > 0 && (
+                                    <View style={styles.infoMembersList}>
+                                        {currentChat.participants.map((p: any) => {
+                                            const pName = p.username || p.name || 'Unknown User';
+                                            const pAvatar = p.avatar;
+                                            const pRole = p.role === 'admin' ? 'Admin' : 'Member';
+                                            const pInitial = pName.trim().charAt(0).toUpperCase() || '?';
+                                            const pIsOnline = onlineStatuses[p.id || p.userId]?.status === 'online';
+
+                                            return (
+                                                <View key={p.id || p.userId} style={styles.infoMemberItem}>
+                                                    <View style={styles.infoMemberAvatarContainer}>
+                                                        {pAvatar ? (
+                                                            <Image source={{ uri: pAvatar }} style={styles.infoMemberAvatar} />
+                                                        ) : (
+                                                            <View style={styles.infoMemberAvatarPlaceholder}>
+                                                                <Text style={styles.infoMemberAvatarText}>{pInitial}</Text>
+                                                            </View>
+                                                        )}
+                                                        <View style={[styles.infoMemberOnlineDot, { backgroundColor: pIsOnline ? '#4ADE80' : '#FDB52A' }]} />
+                                                    </View>
+                                                    <View style={styles.infoMemberDetails}>
+                                                        <Text style={styles.infoMemberName} numberOfLines={1}>{pName}</Text>
+                                                        <Text style={styles.infoMemberRole}>{pRole}</Text>
+                                                    </View>
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                )}
+
+                                {renderRealFiles()}
+
+                            </ScrollView>
+
+                            <View style={styles.reportButtonStickyContainer}>
+                                <TouchableOpacity style={styles.reportButton} activeOpacity={0.7} onPress={() => { }}>
+                                    <Svg width="20" height="20" viewBox="0 0 10 10" fill="none">
+                                        <Path d="M7.50837 5.13717L7.00004 4.62884C6.87921 4.52467 6.80837 4.37051 6.80421 4.19967C6.79587 4.01217 6.87087 3.82467 7.00837 3.68717L7.50837 3.18717C7.94171 2.75384 8.10421 2.33717 7.96671 2.00801C7.83337 1.68301 7.42087 1.50384 6.81254 1.50384H2.45837V1.14551C2.45837 0.974674 2.31671 0.833008 2.14587 0.833008C1.97504 0.833008 1.83337 0.974674 1.83337 1.14551V8.85384C1.83337 9.02467 1.97504 9.16634 2.14587 9.16634C2.31671 9.16634 2.45837 9.02467 2.45837 8.85384V6.82051H6.81254C7.41254 6.82051 7.81671 6.63717 7.95421 6.30801C8.09171 5.97884 7.93337 5.56634 7.50837 5.13717Z" fill="#FF453A" />
+                                    </Svg>
+                                    <Text style={styles.reportButtonText}>Report This Conversation</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
+
                 {/* Custom Header */}
                 <View style={styles.headerContainer}>
                     <TouchableOpacity
@@ -626,22 +1161,28 @@ const ChatRoom = () => {
                         onPress={() => navigation.goBack()}
                         activeOpacity={0.8}
                     >
-                        <ArrowWhiteLeftIcon width={24} height={24} />
+                        <ArrowLeftIcon width={24} height={24} />
                     </TouchableOpacity>
 
-                    <View style={styles.userInfoContainer}>
-                        {showHeaderAvatarImage ? (
+                    <TouchableOpacity
+                        style={styles.userInfoContainer}
+                        activeOpacity={0.7}
+                        onPress={() => setIsInfoModalVisible(true)}
+                    >
+                        {!isGroup && showHeaderAvatarImage && (
                             <Image source={{ uri: headerAvatarUri }} style={styles.headerAvatar} />
-                        ) : (
+                        )}
+                        {!isGroup && !showHeaderAvatarImage && (
                             <View style={styles.headerAvatarPlaceholder}>
                                 <Text style={styles.headerAvatarPlaceholderText}>{headerAvatarInitial}</Text>
                             </View>
                         )}
+
                         <View style={styles.userInfoText}>
-                            <Text style={styles.userName}>{headerName}</Text>
-                            <Text style={styles.userStatus}>{isOnline ? 'Online' : 'Offline'}</Text>
+                            <Text style={styles.userName} numberOfLines={1}>{headerName}</Text>
+                            <Text style={styles.userStatus}>{headerStatusText}</Text>
                         </View>
-                    </View>
+                    </TouchableOpacity>
 
                     <View style={styles.headerActionsPill}>
                         <TouchableOpacity style={styles.actionIconPill} activeOpacity={0.7}>
@@ -678,76 +1219,148 @@ const ChatRoom = () => {
                 )}
 
                 {/* Input Area */}
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    keyboardVerticalOffset={Platform.OS === 'ios' ? 55 : 20}
-                >
-                    {pendingAttachment ? (
-                        <View style={styles.attachmentPreviewBar}>
-                            <Text style={styles.attachmentPreviewName} numberOfLines={1}>
-                                {pendingAttachment.name}
-                            </Text>
-                            <TouchableOpacity
-                                onPress={handleCancelPendingAttachment}
-                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                style={styles.attachmentPreviewClose}
-                            >
-                                <CloseIcon width={16} height={16} color={COLORS.white} />
-                            </TouchableOpacity>
-                        </View>
-                    ) : null}
-                    <View style={styles.inputContainer}>
-                        <View style={styles.textInputWrapper}>
-                            {isRecording ? (
-                                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginLeft: 10 }}>
-                                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: 'red', marginRight: 10 }} />
-                                    <Text style={{ fontFamily: FONT_BODY, fontSize: 15, color: 'red' }}>
-                                        Recording... {Math.floor(recordTime / 1000)}s
-                                    </Text>
-                                </View>
-                            ) : (
-                                <TextInput
-                                    style={styles.textInput}
-                                    placeholder="Type Message"
-                                    placeholderTextColor="#8E8E93"
-                                    value={message}
-                                    onChangeText={setMessage}
-                                    onSubmitEditing={pendingAttachment ? handleSendPendingAttachment : handleSendMessage}
-                                />
-                            )}
-                            {uploading ? (
-                                <ActivityIndicator size="small" color="#1366D9" style={{ padding: 8 }} />
-                            ) : !isRecording && (
-                                <TouchableOpacity style={styles.attachmentButton} activeOpacity={0.7} onPress={handlePickAttachment}>
-                                    <AttachmentIcon width={24} height={24} />
+                {renderTypingIndicator()}
+                {Platform.OS === 'android' && Number(Platform.Version) > 33 ? (
+                    <View
+                        style={{ paddingBottom: keyboardHeight > 0 ? (keyboardHeight - insets.bottom + 45) : 0 }}
+                    >
+                        {pendingAttachment ? (
+                            <View style={styles.attachmentPreviewBar}>
+                                <Text style={styles.attachmentPreviewName} numberOfLines={1}>
+                                    {pendingAttachment.name}
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={handleCancelPendingAttachment}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    style={styles.attachmentPreviewClose}
+                                >
+                                    <CloseIcon width={16} height={16} color={COLORS.white} />
+                                </TouchableOpacity>
+                            </View>
+                        ) : null}
+                        <View style={styles.inputContainer}>
+                            <View style={styles.textInputWrapper}>
+                                {isRecording ? (
+                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginLeft: 10 }}>
+                                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: 'red', marginRight: 10 }} />
+                                        <Text style={{ fontFamily: FONT_BODY, fontSize: 15, color: 'red' }}>
+                                            Recording... {Math.floor(recordTime / 1000)}s
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="Type Message"
+                                        placeholderTextColor="#8E8E93"
+                                        value={message}
+                                        onChangeText={handleMessageChange}
+                                        onSubmitEditing={pendingAttachment ? handleSendPendingAttachment : handleSendMessage}
+                                    />
+                                )}
+                                {uploading ? (
+                                    <ActivityIndicator size="small" color="#1366D9" style={{ padding: 8 }} />
+                                ) : !isRecording && (
+                                    <TouchableOpacity style={styles.attachmentButton} activeOpacity={0.7} onPress={handlePickAttachment}>
+                                        <AttachmentIcon width={24} height={24} />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+
+                            {!isRecording && (
+                                <TouchableOpacity
+                                    style={styles.iconButton}
+                                    activeOpacity={0.8}
+                                    onPress={pendingAttachment ? handleSendPendingAttachment : handleSendMessage}
+                                >
+                                    <SendPaperplaneIcon width={24} height={24} />
                                 </TouchableOpacity>
                             )}
-                        </View>
 
-                        {!isRecording && (
                             <TouchableOpacity
-                                style={styles.iconButton}
+                                style={[styles.iconButton, isRecording && { backgroundColor: '#1366D9' }]}
                                 activeOpacity={0.8}
-                                onPress={pendingAttachment ? handleSendPendingAttachment : handleSendMessage}
+                                onPress={isRecording ? handleStopRecording : handleStartRecording}
                             >
-                                <SendPaperplaneIcon width={24} height={24} />
+                                {isRecording ? (
+                                    <StopIcon width={24} height={24} />
+                                ) : (
+                                    <MicIcon width={24} height={24} />
+                                )}
                             </TouchableOpacity>
-                        )}
-
-                        <TouchableOpacity
-                            style={[styles.iconButton, isRecording && { backgroundColor: '#1366D9' }]}
-                            activeOpacity={0.8}
-                            onPress={isRecording ? handleStopRecording : handleStartRecording}
-                        >
-                            {isRecording ? (
-                                <StopIcon width={24} height={24} />
-                            ) : (
-                                <MicIcon width={24} height={24} />
-                            )}
-                        </TouchableOpacity>
+                        </View>
                     </View>
-                </KeyboardAvoidingView>
-            </ImageBackground>
+                ) : (
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        keyboardVerticalOffset={Platform.OS === 'ios' ? 55 : 20}
+                    >
+                        {pendingAttachment ? (
+                            <View style={styles.attachmentPreviewBar}>
+                                <Text style={styles.attachmentPreviewName} numberOfLines={1}>
+                                    {pendingAttachment.name}
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={handleCancelPendingAttachment}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                    style={styles.attachmentPreviewClose}
+                                >
+                                    <CloseIcon width={16} height={16} color={COLORS.white} />
+                                </TouchableOpacity>
+                            </View>
+                        ) : null}
+                        <View style={styles.inputContainer}>
+                            <View style={styles.textInputWrapper}>
+                                {isRecording ? (
+                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginLeft: 10 }}>
+                                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: 'red', marginRight: 10 }} />
+                                        <Text style={{ fontFamily: FONT_BODY, fontSize: 15, color: 'red' }}>
+                                            Recording... {Math.floor(recordTime / 1000)}s
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="Type Message"
+                                        placeholderTextColor="#8E8E93"
+                                        value={message}
+                                        onChangeText={handleMessageChange}
+                                        onSubmitEditing={pendingAttachment ? handleSendPendingAttachment : handleSendMessage}
+                                    />
+                                )}
+                                {uploading ? (
+                                    <ActivityIndicator size="small" color="#1366D9" style={{ padding: 8 }} />
+                                ) : !isRecording && (
+                                    <TouchableOpacity style={styles.attachmentButton} activeOpacity={0.7} onPress={handlePickAttachment}>
+                                        <AttachmentIcon width={24} height={24} />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+
+                            {!isRecording && (
+                                <TouchableOpacity
+                                    style={styles.iconButton}
+                                    activeOpacity={0.8}
+                                    onPress={pendingAttachment ? handleSendPendingAttachment : handleSendMessage}
+                                >
+                                    <SendPaperplaneIcon width={24} height={24} />
+                                </TouchableOpacity>
+                            )}
+
+                            <TouchableOpacity
+                                style={[styles.iconButton, isRecording && { backgroundColor: '#1366D9' }]}
+                                activeOpacity={0.8}
+                                onPress={isRecording ? handleStopRecording : handleStartRecording}
+                            >
+                                {isRecording ? (
+                                    <StopIcon width={24} height={24} />
+                                ) : (
+                                    <MicIcon width={24} height={24} />
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </KeyboardAvoidingView>
+                )}
+            </View>
         </SafeAreaView>
     );
 };
@@ -755,12 +1368,11 @@ const ChatRoom = () => {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: '#0A58CA',
+        backgroundColor: '#F7F7F9',
     },
     background: {
         flex: 1,
-        width: '100%',
-        height: '100%',
+        backgroundColor: '#F7F7F9',
     },
     headerContainer: {
         flexDirection: 'row',
@@ -776,7 +1388,7 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        backgroundColor: COLORS.white,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -813,12 +1425,12 @@ const styles = StyleSheet.create({
     userName: {
         fontFamily: FONT_HEADING,
         fontSize: 16,
-        color: COLORS.white,
+        color: COLORS.black,
     },
     userStatus: {
         fontFamily: FONT_BODY,
         fontSize: 12,
-        color: 'rgba(255, 255, 255, 0.8)',
+        color: '#5A5A5A',
     },
     headerActionsPill: {
         flexDirection: 'row',
@@ -914,28 +1526,55 @@ const styles = StyleSheet.create({
         marginRight: 12,
         marginBottom: 4,
     },
+    avatarSmallPlaceholder: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        marginRight: 12,
+        marginBottom: 4,
+        backgroundColor: COLORS.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarSmallInitial: {
+        fontFamily: FONT_BODY,
+        fontSize: 14,
+        fontWeight: '700',
+        color: COLORS.white,
+    },
     messageBubble: {
         paddingHorizontal: 20,
         paddingVertical: 14,
         maxWidth: '75%',
     },
     messageBubbleReceived: {
-        backgroundColor: '#4A81CD',
-        borderTopLeftRadius: 12,
-        borderTopRightRadius: 12,
-        borderBottomRightRadius: 12,
-        borderBottomLeftRadius: 0,
+        backgroundColor: '#508BE3',
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 20,
+        borderBottomRightRadius: 20,
+        borderBottomLeftRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.02,
+        shadowRadius: 4,
+        elevation: 0.5,
     },
     messageBubbleSent: {
         backgroundColor: COLORS.white,
-        borderTopLeftRadius: 16,
-        borderTopRightRadius: 16,
-        borderBottomLeftRadius: 16,
-        borderBottomRightRadius: 2,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 0,
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.02,
+        shadowRadius: 4,
+        elevation: 0.5,
     },
     messageText: {
         fontFamily: FONT_BODY,
-        fontSize: 14,
+        fontWeight: '400',
+        fontSize: 16,
         lineHeight: 20,
     },
     messageTextReceived: {
@@ -1097,6 +1736,329 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.white,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    typingIndicatorContainer: {
+        paddingHorizontal: 20,
+        paddingVertical: 8,
+        backgroundColor: 'transparent',
+    },
+    typingIndicatorText: {
+        fontFamily: FONT_BODY,
+        fontSize: 12,
+        color: COLORS.textSecondary,
+        fontStyle: 'italic',
+    },
+    infoSheetContainer: {
+        paddingTop: 16,
+        paddingBottom: 24,
+        paddingHorizontal: 20,
+    },
+    infoSheetHeader: {
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    infoLargeAvatar: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        marginBottom: 16,
+    },
+    infoLargeAvatarPlaceholder: {
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    infoLargeAvatarText: {
+        fontFamily: FONT_HEADING,
+        fontSize: 32,
+        color: COLORS.black,
+    },
+    infoOnlineDot: {
+        position: 'absolute',
+        bottom: 2,
+        right: 4,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: COLORS.white,
+    },
+    infoNameText: {
+        fontFamily: FONT_HEADING,
+        fontSize: 22,
+        color: COLORS.black,
+        marginBottom: 6,
+        textAlign: 'center',
+    },
+    infoRoleText: {
+        fontFamily: FONT_BODY,
+        fontSize: 14,
+        color: 'rgba(0,0,0,0.6)',
+    },
+    infoMembersBadge: {
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+    },
+    infoMembersBadgeText: {
+        fontFamily: FONT_BODY,
+        fontSize: 12,
+        color: COLORS.black,
+    },
+    infoMembersList: {
+        marginBottom: 24,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0,0,0,0.05)',
+        paddingTop: 20,
+    },
+    infoSectionTitle: {
+        fontFamily: FONT_HEADING,
+        fontSize: 12,
+        color: 'rgba(0,0,0,0.5)',
+        marginBottom: 12,
+        letterSpacing: 1,
+    },
+    infoMemberItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+    },
+    infoMemberAvatarContainer: {
+        position: 'relative',
+        marginRight: 12,
+    },
+    infoMemberAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+    },
+    infoMemberAvatarPlaceholder: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    infoMemberAvatarText: {
+        fontFamily: FONT_HEADING,
+        fontSize: 18,
+        color: COLORS.black,
+    },
+    infoMemberOnlineDot: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: COLORS.white,
+    },
+    infoMemberDetails: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    infoMemberName: {
+        fontFamily: FONT_BODY,
+        fontWeight: '600',
+        fontSize: 16,
+        color: COLORS.black,
+        marginBottom: 2,
+    },
+    infoMemberRole: {
+        fontFamily: FONT_BODY,
+        fontSize: 12,
+        color: 'rgba(0,0,0,0.5)',
+    },
+    reportButtonStickyContainer: {
+        paddingHorizontal: 20,
+        paddingTop: 10,
+        paddingBottom: 20,
+        backgroundColor: '#FFFFFF',
+    },
+    reportButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.1)',
+        paddingVertical: 14,
+        borderRadius: 12,
+        gap: 10,
+    },
+    reportButtonText: {
+        fontFamily: FONT_BODY,
+        fontWeight: '600',
+        fontSize: 16,
+        color: COLORS.black,
+    },
+    infoTabsWrapper: {
+        flexDirection: 'row',
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        borderRadius: 12,
+        padding: 4,
+        marginBottom: 20,
+    },
+    infoTabButton: {
+        flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    infoTabButtonActive: {
+        backgroundColor: COLORS.white,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    infoTabText: {
+        fontFamily: FONT_BODY,
+        fontSize: 14,
+        color: 'rgba(0,0,0,0.5)',
+    },
+    infoTabTextActive: {
+        color: COLORS.black,
+    },
+    infoTogglesContainer: {
+        marginBottom: 24,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.1)',
+        paddingTop: 12,
+    },
+    infoToggleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+    },
+    infoToggleDivider: {
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        marginLeft: 46, // align with text
+    },
+    infoToggleIconWrap: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    infoToggleTextWrap: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    infoToggleTitle: {
+        fontFamily: FONT_HEADING,
+        fontSize: 15,
+        color: COLORS.white,
+        marginBottom: 2,
+    },
+    infoToggleSubtitle: {
+        fontFamily: FONT_BODY,
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.5)',
+    },
+    customSwitch: {
+        width: 44,
+        height: 24,
+        borderRadius: 12,
+        padding: 2,
+        justifyContent: 'center',
+    },
+    customSwitchOn: {
+        backgroundColor: COLORS.white,
+        alignItems: 'flex-end',
+    },
+    customSwitchOff: {
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        alignItems: 'flex-start',
+    },
+    customSwitchThumb: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+    },
+    customSwitchThumbOn: {
+        backgroundColor: COLORS.black,
+    },
+    customSwitchThumbOff: {
+        backgroundColor: COLORS.white,
+    },
+    mockFilesContainer: {
+        marginBottom: 24,
+    },
+    mockFileItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
+    },
+    mockFileIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    mockFileDetails: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    mockFileName: {
+        fontFamily: FONT_BODY,
+        fontSize: 15,
+        color: COLORS.black,
+        marginBottom: 4,
+    },
+    mockFileMeta: {
+        fontFamily: FONT_BODY,
+        fontSize: 12,
+        color: 'rgba(0,0,0,0.5)',
+    },
+    lightModalSafeArea: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+    },
+    lightModalContainer: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+    },
+    lightModalTopBar: {
+        height: 56,
+        paddingHorizontal: 20,
+        justifyContent: 'center',
+        alignItems: 'flex-end',
+    },
+    lightModalScroll: {
+        flex: 1,
+    },
+    lightModalScrollContent: {
+        paddingHorizontal: 20,
+        paddingBottom: 40,
+    },
+    infoLargeAvatarWrapper: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: 'rgba(0,0,0,0.03)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 20,
+        alignSelf: 'center',
+        overflow: 'hidden',
+    },
+    infoLargeAvatarImage: {
+        width: 120,
+        height: 150,
     },
 });
 
