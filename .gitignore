@@ -10,6 +10,7 @@ ios/.xcode.env.local
 android/build
 android/.gradle
 android/app/build
+android/app/.cxx
 *.apk
 *.aab
 

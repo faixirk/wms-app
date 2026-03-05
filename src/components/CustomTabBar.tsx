@@ -103,7 +103,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => 
                             <View key="floating-button" style={styles.floatingButtonContainer}>
                                 <TouchableOpacity
                                     style={styles.floatingButton}
-                                    onPress={handleFloatingButtonPress}
+                                    // onPress={handleFloatingButtonPress}
                                     activeOpacity={0.8}>
                                     <Text style={styles.floatingButtonText}>+</Text>
                                 </TouchableOpacity>

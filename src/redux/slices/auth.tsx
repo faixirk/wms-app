@@ -243,6 +243,8 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.error = null;
       state.greeting = null;
+      state.hasSelectedWorkspace = false;
+      state.selectedWorkspaceId = null;
     },
     setIsFirstLaunch: (state, action: PayloadAction<boolean>) => {
       state.isFirstLaunch = action.payload;

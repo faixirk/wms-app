@@ -1,4 +1,0 @@
-/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/RelWithDebInfo/6l4r2s75/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/foo.dir
-/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/RelWithDebInfo/6l4r2s75/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/boo.dir
-/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/RelWithDebInfo/6l4r2s75/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/edit_cache.dir
-/Volumes/Amaze/GithubProjects/wms-app/android/app/.cxx/RelWithDebInfo/6l4r2s75/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/rebuild_cache.dir

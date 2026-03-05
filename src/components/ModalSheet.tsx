@@ -107,11 +107,12 @@ const ModalSheet = ({
     <Modal
       visible={visible}
       transparent
-      animationType="none"
+      animationType="slide"
       onRequestClose={onClose}
+      {...(Platform.OS === 'android' && { statusBarTranslucent: true })}
     >
-      <View style={StyleSheet.absoluteFill}>
-        {visible && <StatusBar hidden={true} />}
+      <View style={StyleSheet.absoluteFill} collapsable={false}>
+        {visible && Platform.OS === 'ios' && <StatusBar hidden={true} />}
         <Animated.View
           style={[
             StyleSheet.absoluteFill,

@@ -16,10 +16,16 @@ export interface ApiMessage {
     chatId: string;
     senderId?: string;
     sender?: { id: string; username?: string; name?: string; avatar?: string };
-    content?: string;
+    content?: string | null;
     createdAt: string;
-    attachments?: any[]; // type depending on attachment payload
+    updatedAt?: string;
+    deletedAt?: string | null;
+    deletedById?: string | null;
+    fileName?: string | null;
+    attachments?: any[];
     isRead?: boolean;
+    /** Show "(edited)" label next to timestamp when true. */
+    isEdited?: boolean;
 }
 
 export interface ApiChat {
@@ -136,7 +142,24 @@ const chatSlice = createSlice({
             } else {
                 state.chats.unshift(action.payload); // push new chat to top
             }
-        }
+        },
+        updateMessageInRoom: (state, action: PayloadAction<{ chatId: string; message: ApiMessage }>) => {
+            const { chatId, message } = action.payload;
+            const list = state.activeRoomMessages[chatId];
+            if (!list) return;
+            const idx = list.findIndex(m => m.id === message.id);
+            if (idx >= 0) {
+                state.activeRoomMessages[chatId][idx] = message;
+            }
+            const chatIndex = state.chats.findIndex(c => c.id === chatId);
+            if (chatIndex >= 0 && state.chats[chatIndex].lastMessage?.id === message.id) {
+                state.chats[chatIndex].lastMessage = message;
+            }
+        },
+        removeChatFromList: (state, action: PayloadAction<string>) => {
+            state.chats = state.chats.filter(c => c.id !== action.payload);
+            delete state.activeRoomMessages[action.payload];
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -179,7 +202,9 @@ export const {
     addMessageToRoom,
     updatePresence,
     updateBulkPresence,
-    updateChatInList
+    updateChatInList,
+    updateMessageInRoom,
+    removeChatFromList,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

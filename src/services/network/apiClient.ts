@@ -75,43 +75,45 @@ apiClient.interceptors.response.use(
 
     if (isSessionExpired && !unauthenticatedAlertShown) {
       unauthenticatedAlertShown = true;
-      const message =
-        (error.response?.data as { message?: string | { message?: string } } | undefined)?.message;
-      const displayMessage =
-        typeof message === 'string'
-          ? message
-          : typeof message === 'object' && message?.message
-            ? message.message
-            : 'Your session has expired or you are not authorized.';
-      Alert.alert(
-        'Session Expired',
-        `${displayMessage} Please log out and log in again.`,
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-            onPress: () => {
-              unauthenticatedAlertShown = false;
-            },
-          },
-          {
-            text: 'Log out',
-            style: 'destructive',
-            onPress: () => {
-              unauthenticatedAlertShown = false;
-              try {
-                const { store } = require('../../redux/store') as {
-                  store: { dispatch: (action: { type: string }) => void };
-                };
-                store.dispatch({ type: 'auth/logout' });
-              } catch (e) {
-                console.warn('Failed to dispatch logout on 401:', e);
-              }
-            },
-          },
-        ],
-        { cancelable: false },
-      );
+      // Direct logout without alert (alert commented out for now)
+      try {
+        const { store } = require('../../redux/store') as {
+          store: { dispatch: (action: { type: string }) => void };
+        };
+        store.dispatch({ type: 'auth/logout' });
+        unauthenticatedAlertShown = false;
+      } catch (e) {
+        console.warn('Failed to dispatch logout on 401:', e);
+      }
+      // Alert.alert(
+      //   'Session Expired',
+      //   `${displayMessage} Please log out and log in again.`,
+      //   [
+      //     {
+      //       text: 'Cancel',
+      //       style: 'cancel',
+      //       onPress: () => {
+      //         unauthenticatedAlertShown = false;
+      //       },
+      //     },
+      //     {
+      //       text: 'Log out',
+      //       style: 'destructive',
+      //       onPress: () => {
+      //         unauthenticatedAlertShown = false;
+      //         try {
+      //           const { store } = require('../../redux/store') as {
+      //             store: { dispatch: (action: { type: string }) => void };
+      //           };
+      //           store.dispatch({ type: 'auth/logout' });
+      //         } catch (e) {
+      //           console.warn('Failed to dispatch logout on 401:', e);
+      //         }
+      //       },
+      //     },
+      //   ],
+      //   { cancelable: false },
+      // );
     }
 
     return Promise.reject(error);

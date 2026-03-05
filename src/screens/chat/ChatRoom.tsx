@@ -12,13 +12,17 @@ import { COLORS } from '../../constants/colors';
 import { FONT_HEADING, FONT_BODY } from '../../constants/fonts';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { fetchChatList, fetchChatMessages, ApiMessage, addMessageToRoom } from '../../redux/slices/chat';
+import { fetchChatList, fetchChatMessages, ApiMessage, addMessageToRoom, updateMessageInRoom, removeChatFromList } from '../../redux/slices/chat';
 import { socketService } from '../../services/network/socket';
 import { uploadFile } from '../../services/network/upload';
 import { useSound } from 'react-native-nitro-sound';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { useCall } from '../../context/CallContext';
 import Svg, { Path } from 'react-native-svg';
+import request from '../../services/network/request';
+import ENDPOINTS from '../../constants/endpoints';
+import ModalSheet from '../../components/ModalSheet';
+import Button from '../../components/Button';
 
 const WAVEFORM_BAR_COUNT = 15;
 
@@ -229,6 +233,15 @@ const ChatRoom = () => {
     const [expandedMessageIds, setExpandedMessageIds] = useState<Record<string, boolean>>({});
     const [callOptionsVisible, setCallOptionsVisible] = useState(false);
     const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
+    const [headerOptionsVisible, setHeaderOptionsVisible] = useState(false);
+    const [messageActionMessage, setMessageActionMessage] = useState<ApiMessage | null>(null);
+    const [editingMessage, setEditingMessage] = useState<ApiMessage | null>(null);
+    const [editDraftContent, setEditDraftContent] = useState('');
+    const [chatActionLoading, setChatActionLoading] = useState(false);
+    const [messageActionLoading, setMessageActionLoading] = useState(false);
+    const [reportModalVisible, setReportModalVisible] = useState(false);
+    const [reportReason, setReportReason] = useState('');
+    const [reportLoading, setReportLoading] = useState(false);
 
     // Info Sheet Tabs state
     const [infoActiveTab, setInfoActiveTab] = useState<'Members' | 'Files' | 'Media' | 'Links'>('Members');
@@ -411,6 +424,19 @@ const ChatRoom = () => {
         socketService.on('chat:message:delivered', handleDelivered);
         socketService.on('chat:read', handleRead);
 
+        const handleMessageEdited = (data: { chatId: string; message: ApiMessage }) => {
+            if (data.chatId === chatId) {
+                dispatch(updateMessageInRoom({ chatId: data.chatId, message: data.message }));
+            }
+        };
+        const handleMessageDeleted = (data: { chatId: string; message: ApiMessage }) => {
+            if (data.chatId === chatId) {
+                dispatch(updateMessageInRoom({ chatId: data.chatId, message: data.message }));
+            }
+        };
+        socketService.on('chat:message:edited', handleMessageEdited);
+        socketService.on('chat:message:deleted', handleMessageDeleted);
+
         // Initial Read Trigger
         const markRoomAsRead = () => {
             socketService.emit('chat:read', {
@@ -438,6 +464,8 @@ const ChatRoom = () => {
             socketService.off('chat:message:ack', handleAck);
             socketService.off('chat:message:delivered', handleDelivered);
             socketService.off('chat:read', handleRead);
+            socketService.off('chat:message:edited', handleMessageEdited);
+            socketService.off('chat:message:deleted', handleMessageDeleted);
             keyboardShowListener.remove();
             keyboardHideListener.remove();
         };
@@ -598,6 +626,152 @@ const ChatRoom = () => {
         setPendingAttachment(null);
     };
 
+    const handleArchiveChat = async () => {
+        if (!chatId || !selectedWorkspaceId || chatActionLoading) return;
+        setChatActionLoading(true);
+        setHeaderOptionsVisible(false);
+        try {
+            await request({
+                method: 'POST',
+                url: ENDPOINTS.CHAT_ARCHIVE(chatId),
+                data: { workspaceId: selectedWorkspaceId },
+            });
+            dispatch(fetchChatList(selectedWorkspaceId));
+            navigation.goBack();
+        } catch (e: any) {
+            const msg = e?.response?.data?.message || e?.message || 'Failed to archive chat';
+            Alert.alert('Error', msg);
+        } finally {
+            setChatActionLoading(false);
+        }
+    };
+
+    const handleDeleteChat = () => {
+        setHeaderOptionsVisible(false);
+        Alert.alert(
+            'Delete Chat',
+            'Are you sure you want to delete this chat? This action cannot be undone.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        if (!chatId || !selectedWorkspaceId || chatActionLoading) return;
+                        setChatActionLoading(true);
+                        try {
+                            await request({
+                                method: 'POST',
+                                url: ENDPOINTS.CHAT_DELETE(chatId),
+                                data: { workspaceId: selectedWorkspaceId },
+                            });
+                            dispatch(removeChatFromList(chatId));
+                            dispatch(fetchChatList(selectedWorkspaceId));
+                            navigation.goBack();
+                        } catch (e: any) {
+                            const msg = e?.response?.data?.message || e?.message || 'Failed to delete chat';
+                            Alert.alert('Error', msg);
+                        } finally {
+                            setChatActionLoading(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const EDIT_WINDOW_MS = 5 * 60 * 1000;
+    const canEditMessage = (msg: ApiMessage) => {
+        const senderId = msg.sender?.id || msg.senderId;
+        if (senderId !== userId) return false;
+        if (msg.deletedAt) return false;
+        const created = new Date(msg.createdAt).getTime();
+        return Date.now() - created <= EDIT_WINDOW_MS;
+    };
+
+    const handleEditMessage = () => {
+        const msg = messageActionMessage;
+        setMessageActionMessage(null);
+        if (!msg) return;
+        setEditingMessage(msg);
+        setEditDraftContent(msg.content || '');
+    };
+
+    const handleSaveEditMessage = async () => {
+        const msg = editingMessage;
+        if (!msg || !chatId || !selectedWorkspaceId || !editDraftContent.trim() || messageActionLoading) return;
+        setMessageActionLoading(true);
+        try {
+            const res = await request<{ message: ApiMessage }>({
+                method: 'PATCH',
+                url: ENDPOINTS.CHAT_MESSAGE_EDIT(chatId, msg.id),
+                data: { workspaceId: selectedWorkspaceId, content: editDraftContent.trim() },
+            });
+            const updated = res?.data?.message;
+            if (updated) dispatch(updateMessageInRoom({ chatId, message: updated }));
+            setEditingMessage(null);
+            setEditDraftContent('');
+        } catch (e: any) {
+            const msg = e?.response?.data?.message || e?.message || 'Failed to edit message';
+            Alert.alert('Error', msg);
+        } finally {
+            setMessageActionLoading(false);
+        }
+    };
+
+    const handleDeleteMessage = async () => {
+        const msg = messageActionMessage;
+        setMessageActionMessage(null);
+        if (!msg || !chatId || !selectedWorkspaceId || messageActionLoading) return;
+        setMessageActionLoading(true);
+        try {
+            const res = await request<{ message: ApiMessage }>({
+                method: 'POST',
+                url: ENDPOINTS.CHAT_MESSAGE_DELETE(chatId, msg.id),
+                data: { workspaceId: selectedWorkspaceId },
+            });
+            const updated = res?.data?.message;
+            if (updated) dispatch(updateMessageInRoom({ chatId, message: updated }));
+        } catch (e: any) {
+            const msg = e?.response?.data?.message || e?.message || 'Failed to delete message';
+            Alert.alert('Error', msg);
+        } finally {
+            setMessageActionLoading(false);
+        }
+    };
+
+    const handleOpenReportModal = () => {
+        setIsInfoModalVisible(false);
+        setTimeout(() => setReportModalVisible(true), 350);
+    };
+    const handleCloseReportModal = () => {
+        if (!reportLoading) {
+            setReportModalVisible(false);
+            setReportReason('');
+        }
+    };
+    const handleSubmitReport = async () => {
+        if (!chatId || !selectedWorkspaceId || reportLoading) return;
+        const reason = reportReason.trim().slice(0, 2000);
+        setReportLoading(true);
+        try {
+            await request({
+                method: 'POST',
+                url: ENDPOINTS.CHAT_REPORT(chatId),
+                data: { workspaceId: selectedWorkspaceId, ...(reason ? { reason } : {}) },
+            });
+            setReportModalVisible(false);
+            setReportReason('');
+            setIsInfoModalVisible(false);
+            Alert.alert('Report submitted', 'Your report has been submitted. The workspace moderators will review it.');
+        } catch (e: any) {
+            const msg = e?.response?.data?.message || e?.message || 'Failed to submit report';
+            Alert.alert('Error', msg);
+        } finally {
+            setReportLoading(false);
+        }
+    };
+
     const handleSendPendingAttachment = async () => {
         if (!pendingAttachment) return;
         setUploading(true);
@@ -649,6 +823,7 @@ const ChatRoom = () => {
         const mainAttachment = hasAttachment ? item.attachments![0] : null;
 
         const msgTime = new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const isEdited = item.isEdited === true || (!!item.updatedAt && !!item.createdAt && new Date(item.updatedAt).getTime() > new Date(item.createdAt).getTime());
 
         // Resolve sender for received messages
         let senderAvatar = null;
@@ -675,8 +850,15 @@ const ChatRoom = () => {
             }
         }
 
+        const isDeleted = !!item.deletedAt;
+        const isOwnMessage = (item.sender?.id || item.senderId) === userId;
+
         return (
-            <View style={[styles.messageRow, isSent ? styles.messageRowRight : styles.messageRowLeft]}>
+            <TouchableOpacity
+                style={[styles.messageRow, isSent ? styles.messageRowRight : styles.messageRowLeft]}
+                activeOpacity={1}
+                onLongPress={isOwnMessage && !isDeleted ? () => setMessageActionMessage(item) : undefined}
+            >
                 {!isSent && (
                     senderAvatar ? (
                         <Image source={{ uri: senderAvatar }} style={styles.avatarSmall} />
@@ -693,7 +875,11 @@ const ChatRoom = () => {
                     styles.messageBubble,
                     isSent ? styles.messageBubbleSent : styles.messageBubbleReceived
                 ]}>
-                    {hasAttachment && mainAttachment ? (
+                    {isDeleted ? (
+                        <Text style={[styles.messageText, isSent ? styles.messageTextSent : styles.messageTextReceived, styles.deletedMessageText]}>
+                            This message was deleted
+                        </Text>
+                    ) : hasAttachment && mainAttachment ? (
                         mainAttachment.mimeType?.includes('image') ? (
                             <TouchableOpacity activeOpacity={0.9} onPress={() => handleOpenAttachment(mainAttachment)}>
                                 <Image source={{ uri: mainAttachment.url }} style={{ width: 150, height: 150, borderRadius: 8, marginBottom: 4 }} resizeMode="cover" />
@@ -750,6 +936,7 @@ const ChatRoom = () => {
                         );
                     })()}
 
+                    {!isDeleted && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 4 }}>
                         <Text style={{
                             fontSize: 10,
@@ -757,6 +944,7 @@ const ChatRoom = () => {
                             marginRight: isSent ? 4 : 0
                         }}>
                             {msgTime}
+                            {isEdited ? ' (edited)' : ''}
                         </Text>
 
                         {isSent && (() => {
@@ -776,8 +964,9 @@ const ChatRoom = () => {
                             return icon;
                         })()}
                     </View>
+                    )}
                 </View>
-            </View>
+            </TouchableOpacity>
         );
     };
 
@@ -1143,7 +1332,7 @@ const ChatRoom = () => {
                             </ScrollView>
 
                             <View style={styles.reportButtonStickyContainer}>
-                                <TouchableOpacity style={styles.reportButton} activeOpacity={0.7} onPress={() => { }}>
+                                <TouchableOpacity style={styles.reportButton} activeOpacity={0.7} onPress={handleOpenReportModal}>
                                     <Svg width="20" height="20" viewBox="0 0 10 10" fill="none">
                                         <Path d="M7.50837 5.13717L7.00004 4.62884C6.87921 4.52467 6.80837 4.37051 6.80421 4.19967C6.79587 4.01217 6.87087 3.82467 7.00837 3.68717L7.50837 3.18717C7.94171 2.75384 8.10421 2.33717 7.96671 2.00801C7.83337 1.68301 7.42087 1.50384 6.81254 1.50384H2.45837V1.14551C2.45837 0.974674 2.31671 0.833008 2.14587 0.833008C1.97504 0.833008 1.83337 0.974674 1.83337 1.14551V8.85384C1.83337 9.02467 1.97504 9.16634 2.14587 9.16634C2.31671 9.16634 2.45837 9.02467 2.45837 8.85384V6.82051H6.81254C7.41254 6.82051 7.81671 6.63717 7.95421 6.30801C8.09171 5.97884 7.93337 5.56634 7.50837 5.13717Z" fill="#FF453A" />
                                     </Svg>
@@ -1185,9 +1374,9 @@ const ChatRoom = () => {
                     </TouchableOpacity>
 
                     <View style={styles.headerActionsPill}>
-                        <TouchableOpacity style={styles.actionIconPill} activeOpacity={0.7}>
+                        {/* <TouchableOpacity style={styles.actionIconPill} activeOpacity={0.7}>
                             <CalenderBlueIcon width={24} height={24} />
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
                         <TouchableOpacity
                             style={styles.actionIconPill}
                             activeOpacity={0.7}
@@ -1195,8 +1384,146 @@ const ChatRoom = () => {
                         >
                             <CallIcon width={20} height={20} />
                         </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.actionIconPill}
+                            activeOpacity={0.7}
+                            onPress={() => setHeaderOptionsVisible(true)}
+                        >
+                            <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+                                <Path d="M10 11.25a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5zM10 5a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5zM10 17.5a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" fill="#1366D9" />
+                            </Svg>
+                        </TouchableOpacity>
                     </View>
                 </View>
+
+                {/* Header options – modal sheet (Archive / Delete chat) */}
+                <ModalSheet
+                    visible={headerOptionsVisible}
+                    onClose={() => setHeaderOptionsVisible(false)}
+                    heightFraction={0.24}
+                    dismissOnOverlayPress={!chatActionLoading}
+                >
+                    <Text style={styles.reportSheetTitle}>Chat options</Text>
+                    <TouchableOpacity
+                        style={styles.headerOptionSheetItem}
+                        onPress={handleArchiveChat}
+                        disabled={chatActionLoading}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.headerOptionText}>Archive chat</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.headerOptionSheetItem, styles.headerOptionSheetItemDanger]}
+                        onPress={handleDeleteChat}
+                        disabled={chatActionLoading}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.headerOptionTextDanger}>Delete chat</Text>
+                    </TouchableOpacity>
+                </ModalSheet>
+
+                {/* Message action – modal sheet (Edit / Delete message on long-press) */}
+                <ModalSheet
+                    visible={!!messageActionMessage}
+                    onClose={() => setMessageActionMessage(null)}
+                    heightFraction={0.24}
+                    dismissOnOverlayPress={!messageActionLoading}
+                >
+                    <Text style={styles.reportSheetTitle}>Message options</Text>
+                    {messageActionMessage && canEditMessage(messageActionMessage) && (
+                        <TouchableOpacity
+                            style={styles.headerOptionSheetItem}
+                            onPress={handleEditMessage}
+                            disabled={messageActionLoading}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={styles.headerOptionText}>Edit message</Text>
+                        </TouchableOpacity>
+                    )}
+                    {messageActionMessage && (messageActionMessage.sender?.id || messageActionMessage.senderId) === userId && (
+                        <TouchableOpacity
+                            style={[styles.headerOptionSheetItem, styles.headerOptionSheetItemDanger]}
+                            onPress={handleDeleteMessage}
+                            disabled={messageActionLoading}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={styles.headerOptionTextDanger}>Delete message</Text>
+                        </TouchableOpacity>
+                    )}
+                </ModalSheet>
+
+                {/* Edit message modal */}
+                <Modal
+                    visible={!!editingMessage}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => { setEditingMessage(null); setEditDraftContent(''); }}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        style={styles.headerOptionsBackdrop}
+                        onPress={() => { setEditingMessage(null); setEditDraftContent(''); }}
+                    >
+                        <View style={styles.editMessageBox} onStartShouldSetResponder={() => true}>
+                            <Text style={styles.editMessageTitle}>Edit message</Text>
+                            <TextInput
+                                style={styles.editMessageInput}
+                                value={editDraftContent}
+                                onChangeText={setEditDraftContent}
+                                placeholder="Message"
+                                placeholderTextColor="#8E8E93"
+                                multiline
+                            />
+                            <View style={styles.editMessageActions}>
+                                <TouchableOpacity style={styles.editMessageCancelBtn} onPress={() => { setEditingMessage(null); setEditDraftContent(''); }}>
+                                    <Text style={styles.editMessageCancelText}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.editMessageSaveBtn, !editDraftContent.trim() && styles.editMessageSaveBtnDisabled]}
+                                    onPress={handleSaveEditMessage}
+                                    disabled={!editDraftContent.trim() || messageActionLoading}
+                                >
+                                    <Text style={styles.editMessageSaveText}>Save</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </TouchableOpacity>
+                </Modal>
+
+                {/* Report chat – modal sheet (opens after detail modal closes) */}
+                <ModalSheet
+                    visible={reportModalVisible}
+                    onClose={handleCloseReportModal}
+                    heightFraction={0.26}
+                    dismissOnOverlayPress={!reportLoading}
+                >
+                    <Text style={styles.reportSheetTitle}>Report conversation</Text>
+                    <TextInput
+                        style={styles.reportSheetInput}
+                        value={reportReason}
+                        onChangeText={(t) => setReportReason(t.slice(0, 2000))}
+                        placeholder="Reason (optional, max 2000 characters)"
+                        placeholderTextColor="#8E8E93"
+                        multiline
+                        editable={!reportLoading}
+                    />
+                    <View style={styles.reportSheetActions}>
+                        <Button
+                            title="Cancel"
+                            variant="outline"
+                            onPress={handleCloseReportModal}
+                            disabled={reportLoading}
+                            style={styles.reportSheetButton}
+                        />
+                        <Button
+                            title={reportLoading ? 'Submitting...' : 'Submit'}
+                            variant="primary"
+                            onPress={handleSubmitReport}
+                            disabled={reportLoading}
+                            style={styles.reportSheetButton}
+                        />
+                    </View>
+                </ModalSheet>
 
                 {/* Chat List */}
                 {isLoading && messages.length === 0 ? (
@@ -1434,7 +1761,7 @@ const styles = StyleSheet.create({
     },
     headerActionsPill: {
         flexDirection: 'row',
-        backgroundColor: '#F5F5F5',
+        backgroundColor: '#F7F7F9',
         borderTopLeftRadius: 40,
         borderBottomLeftRadius: 40,
         paddingLeft: 20,
@@ -1501,6 +1828,143 @@ const styles = StyleSheet.create({
         fontFamily: FONT_BODY,
         fontSize: 16,
         color: '#1C1C1E',
+    },
+    reportSheetTitle: {
+        fontFamily: FONT_HEADING,
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#1C1C1E',
+        textAlign: 'center',
+        marginBottom: 12,
+        marginTop: 20,
+    },
+    reportSheetInput: {
+        fontFamily: FONT_BODY,
+        fontSize: 14,
+        color: '#1C1C1E',
+        backgroundColor: '#F2F2F7',
+        borderRadius: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        minHeight: 72,
+        maxHeight: 100,
+        marginBottom: 16,
+        textAlignVertical: 'top',
+    },
+    reportSheetActions: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 12,
+        marginTop: 4,
+    },
+    reportSheetButton: {
+        flex: 1,
+    },
+    headerOptionsBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerOptionsBox: {
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        minWidth: 200,
+        paddingVertical: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    headerOptionItem: {
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+    },
+    headerOptionSheetItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        backgroundColor: '#F2F2F7',
+        marginBottom: 12,
+    },
+    headerOptionSheetItemDanger: {
+        backgroundColor: 'rgba(255, 59, 48, 0.08)',
+    },
+    headerOptionText: {
+        fontFamily: FONT_BODY,
+        fontSize: 16,
+        color: '#1C1C1E',
+    },
+    headerOptionItemDanger: {},
+    headerOptionTextDanger: {
+        fontFamily: FONT_BODY,
+        fontSize: 16,
+        color: '#FF3B30',
+    },
+    deletedMessageText: {
+        fontStyle: 'italic',
+        opacity: 0.8,
+    },
+    editMessageBox: {
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        marginHorizontal: 24,
+        padding: 20,
+        minWidth: 280,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    editMessageTitle: {
+        fontFamily: FONT_HEADING,
+        fontSize: 18,
+        color: '#1C1C1E',
+        marginBottom: 12,
+    },
+    editMessageInput: {
+        fontFamily: FONT_BODY,
+        fontSize: 16,
+        color: '#1C1C1E',
+        borderWidth: 1,
+        borderColor: '#E5E5EA',
+        borderRadius: 8,
+        padding: 12,
+        minHeight: 80,
+        maxHeight: 120,
+        marginBottom: 16,
+    },
+    editMessageActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: 12,
+    },
+    editMessageCancelBtn: {
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+    },
+    editMessageCancelText: {
+        fontFamily: FONT_BODY,
+        fontSize: 16,
+        color: '#8E8E93',
+    },
+    editMessageSaveBtn: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        backgroundColor: COLORS.primary,
+        borderRadius: 8,
+    },
+    editMessageSaveBtnDisabled: {
+        opacity: 0.5,
+    },
+    editMessageSaveText: {
+        fontFamily: FONT_BODY,
+        fontSize: 16,
+        color: COLORS.white,
     },
     chatListContent: {
         paddingHorizontal: 20,

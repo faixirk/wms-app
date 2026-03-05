@@ -149,7 +149,7 @@ const Home = ({ navigation }: any) => {
                     >
                         <View style={styles.remainingTasksContent}>
                             <Text style={styles.remainingTasksTitle}>REMAINING TASKS</Text>
-                            <Text style={styles.remainingTasksCount}>{totalTasks}</Text>
+                            <Text style={styles.remainingTasksCount}>{'0'}</Text>
                         </View>
 
                         <TouchableOpacity style={styles.blackPillButton} activeOpacity={0.8}>

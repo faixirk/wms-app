@@ -604,7 +604,7 @@ const ChatList = ({ navigation }: any) => {
             <ModalSheet
                 visible={isCreateOptionsModalVisible}
                 onClose={() => setIsCreateOptionsModalVisible(false)}
-                heightFraction={0.3}
+                heightFraction={0.24}
             >
                 <View style={styles.optionsContent}>
                     <Text style={styles.modalNewChatTitle}>NEW CHAT</Text>

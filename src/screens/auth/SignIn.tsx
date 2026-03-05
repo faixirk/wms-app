@@ -162,12 +162,12 @@ const SignIn = () => {
       });
   };
 
-  const onSignInWithEmployeeId = () => {
-    // TODO: navigate or modal
+  const onSignInWithGoogle = () => {
+    // TODO: Google sign-in
   };
 
-  const onSignInWithPhone = () => {
-    // TODO: navigate or modal
+  const onSignInWithApple = () => {
+    // TODO: Apple sign-in
   };
 
   const onSignUp = () => {
@@ -352,20 +352,41 @@ const SignIn = () => {
             <View style={styles.orLine} />
           </View>
 
-          <Button
-            title="SIGN IN WITH EMPLOYEE ID"
-            variant="outline"
-            titleTypography="bodyMedium"
-            onPress={onSignInWithEmployeeId}
-            style={styles.altButton}
-          />
-          <Button
-            title="SIGN IN WITH PHONE"
-            variant="outline"
-            titleTypography="bodyMedium"
-            onPress={onSignInWithPhone}
-            style={styles.altButton}
-          />
+          {Platform.OS === 'ios' ? (
+            <>
+              <Button
+                title="SIGN IN WITH APPLE"
+                variant="outline"
+                titleTypography="bodyMedium"
+                onPress={onSignInWithApple}
+                style={styles.altButton}
+              />
+              <Button
+                title="SIGN IN WITH GOOGLE"
+                variant="outline"
+                titleTypography="bodyMedium"
+                onPress={onSignInWithGoogle}
+                style={styles.altButton}
+              />
+            </>
+          ) : (
+            <>
+              <Button
+                title="SIGN IN WITH GOOGLE"
+                variant="outline"
+                titleTypography="bodyMedium"
+                onPress={onSignInWithGoogle}
+                style={styles.altButton}
+              />
+              <Button
+                title="SIGN IN WITH APPLE"
+                variant="outline"
+                titleTypography="bodyMedium"
+                onPress={onSignInWithApple}
+                style={styles.altButton}
+              />
+            </>
+          )}
         </View>
 
         {/* Sign Up */}

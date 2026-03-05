@@ -9,6 +9,7 @@ import {
   StyleProp,
   ViewStyle,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { FONT_BODY, FONT_HEADING } from '../constants/fonts';
@@ -43,9 +44,10 @@ const StatusModal = ({
       transparent
       animationType="fade"
       onRequestClose={onClose}
+      {...(Platform.OS === 'android' && { statusBarTranslucent: true })}
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        {visible && <StatusBar hidden={true} />}
+        {visible && Platform.OS === 'ios' && <StatusBar hidden={true} />}
         <Pressable style={[styles.card, style]} onPress={(e) => e.stopPropagation()}>
           <View style={[styles.iconWrap, { backgroundColor: accentColor + '20' }]}>
             {isError ? (
