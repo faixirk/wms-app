@@ -1,18 +1,21 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TextInput, FlatList, Image, TouchableOpacity, ActivityIndicator, Modal, Alert, Keyboard, Animated, Platform } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, TextInput, FlatList, Image, TouchableOpacity, ActivityIndicator, Modal, Alert, Keyboard, Animated, Platform, TouchableWithoutFeedback } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchIcon, SearchWhiteIcon, PlusWhiteIcon, ArrowLeftIcon } from '../../assets/svgs';
+import { Trash } from 'iconsax-react-native';
 import { emptyChatImg, newChatLogo, newGroupLogo } from '../../assets/images';
 import { COLORS } from '../../constants/colors';
 import { FONT_HEADING, FONT_BODY } from '../../constants/fonts';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { useFocusEffect } from '@react-navigation/native';
-import { fetchChatList, ApiChat, updateBulkPresence, updatePresence } from '../../redux/slices/chat';
+import { fetchChatList, ApiChat, updateBulkPresence, updatePresence, removeChatFromList } from '../../redux/slices/chat';
 import { setGreeting } from '../../redux/slices/auth';
 import { socketService } from '../../services/network/socket';
 import request from '../../services/network/request';
 import ENDPOINTS from '../../constants/endpoints';
 import ModalSheet from '../../components/ModalSheet';
+import Button from '../../components/Button';
 
 /** Format message date for chat list: time today, "Yesterday", "X days ago", "X week(s) ago", or date. */
 function formatChatListDate(date: Date): string {
@@ -69,6 +72,11 @@ const ChatList = ({ navigation }: any) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchVisible, setSearchVisible] = useState(false);
     const [memberSearchQuery, setMemberSearchQuery] = useState('');
+    const [activeTab, setActiveTab] = useState<'All' | 'Group' | 'Archive'>('All');
+
+    // Swipeable refs
+    const rowRefs = useRef<Map<string, any>>(new Map());
+    const currentlyOpenSwipeable = useRef<string | null>(null);
 
     // Track active typing per chat room globally
     const [typingChats, setTypingChats] = useState<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -285,6 +293,53 @@ const ChatList = ({ navigation }: any) => {
     };
 
     const renderChatItem = ({ item }: { item: ApiChat }) => {
+        const handleDeleteChat = () => {
+            // Close the current active swipeable locally before alert
+            if (rowRefs.current.has(item.id)) {
+                rowRefs.current.get(item.id)?.close();
+            }
+            
+            Alert.alert(
+                'Delete Chat',
+                'Are you sure you want to delete this chat?',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { 
+                        text: 'Delete', 
+                        style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                await request({
+                                    url: ENDPOINTS.CHAT_DELETE(item.id),
+                                    method: 'DELETE'
+                                });
+                                dispatch(removeChatFromList(item.id));
+                            } catch (e: any) {
+                                Alert.alert('Error', e?.message || 'Failed to delete chat');
+                            }
+                        }
+                    }
+                ]
+            );
+        };
+
+        const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+            const trans = dragX.interpolate({
+                inputRange: [-80, 0],
+                outputRange: [0, 80],
+                extrapolate: 'clamp',
+            });
+            return (
+                <View style={styles.rightActionContainer}>
+                    <Animated.View style={[styles.rightAction, { transform: [{ translateX: trans }] }]}>
+                        <TouchableOpacity style={styles.deleteCircle} onPress={handleDeleteChat}>
+                            <Trash size={24} color="#FFF" variant="Bold" />
+                        </TouchableOpacity>
+                    </Animated.View>
+                </View>
+            );
+        };
+
         // Extract the user details to filter out currentUser safely
         const u = user as any;
         const currentUserId = u?.id || u?.user?.id || u?.data?.user?.id || u?.data?.id;
@@ -328,10 +383,45 @@ const ChatList = ({ navigation }: any) => {
         const statusColor = isOnline ? '#4ADE80' : '#FDB52A';
 
         return (
+            <Swipeable
+                ref={(ref) => {
+                    if (ref) {
+                        rowRefs.current.set(item.id, ref);
+                    } else {
+                        rowRefs.current.delete(item.id);
+                    }
+                }}
+                renderRightActions={renderRightActions}
+                onSwipeableWillOpen={() => {
+                    if (currentlyOpenSwipeable.current && currentlyOpenSwipeable.current !== item.id) {
+                        const previousRef = rowRefs.current.get(currentlyOpenSwipeable.current);
+                        if (previousRef) {
+                            previousRef.close();
+                        }
+                    }
+                    currentlyOpenSwipeable.current = item.id;
+                }}
+                onSwipeableWillClose={() => {
+                    if (currentlyOpenSwipeable.current === item.id) {
+                        currentlyOpenSwipeable.current = null;
+                    }
+                }}
+                friction={2}
+                rightThreshold={40}
+                overshootRight={false}
+                containerStyle={{ overflow: 'visible' }}
+                childrenContainerStyle={{ overflow: 'visible' }}
+            >
             <TouchableOpacity
                 style={styles.chatCard}
                 activeOpacity={0.7}
-                onPress={() => navigation.navigate('ChatRoom', { chatId: item.id })}
+                onPress={() => {
+                    // Force close if it is open so when user comes back it's not stuck open
+                    if (rowRefs.current.has(item.id)) {
+                        rowRefs.current.get(item.id)?.close();
+                    }
+                    navigation.navigate('ChatRoom', { chatId: item.id });
+                }}
             >
                 <View style={styles.avatarContainer}>
                     {showAvatarImage ? (
@@ -378,6 +468,7 @@ const ChatList = ({ navigation }: any) => {
 
                 </View>
             </TouchableOpacity>
+            </Swipeable>
         );
     };
 
@@ -458,6 +549,10 @@ const ChatList = ({ navigation }: any) => {
     });
 
     const filteredChats = chats.filter(chat => {
+        if (activeTab === 'Archive' && !chat.archivedAt) return false;
+        if (activeTab === 'Group' && (chat.archivedAt || chat.type === 'DIRECT')) return false;
+        if (activeTab === 'All' && chat.archivedAt) return false;
+
         const u = user as any;
         const currentUserId = u?.id || u?.user?.id || u?.data?.user?.id || u?.data?.id;
         const otherParticipant = chat.participants?.find((p: any) => p.id !== currentUserId) || chat.participants?.[0];
@@ -513,6 +608,21 @@ const ChatList = ({ navigation }: any) => {
             {/* CHATS title */}
             <Text style={styles.chatsTitle}>CHATS</Text>
 
+            <View style={styles.tabContainer}>
+                {(['All', 'Group', 'Archive'] as const).map(tab => (
+                    <TouchableOpacity
+                        key={tab}
+                        style={[styles.filterTab, activeTab === tab && styles.filterTabActive]}
+                        onPress={() => setActiveTab(tab)}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={[styles.filterTabText, activeTab === tab && styles.filterTabTextActive]}>
+                            {tab}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+
             <View style={styles.content}>
                 {searchVisible && (
                     <View style={styles.searchContainer}>
@@ -566,38 +676,40 @@ const ChatList = ({ navigation }: any) => {
                     </View>
                 }
             >
-                <View
-                    style={{ flex: 1, marginTop: keyboardHeight > 0 ? (Platform.OS === 'ios' ? 75 : 50) : 0 }}
-                >
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalSearchBar}>
-                            <SearchIcon width={20} height={20} color={COLORS.textSecondary} />
-                            <TextInput
-                                style={styles.modalSearchInput}
-                                placeholder="Search Messages"
-                                placeholderTextColor={COLORS.textSecondary}
-                                value={memberSearchQuery}
-                                onChangeText={setMemberSearchQuery}
-                            />
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                    <View
+                        style={{ flex: 1, marginTop: keyboardHeight > 0 ? (Platform.OS === 'ios' ? 75 : 50) : 0 }}
+                    >
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalSearchBar}>
+                                <SearchIcon width={20} height={20} color={COLORS.textSecondary} />
+                                <TextInput
+                                    style={styles.modalSearchInput}
+                                    placeholder="Search Messages"
+                                    placeholderTextColor={COLORS.textSecondary}
+                                    value={memberSearchQuery}
+                                    onChangeText={setMemberSearchQuery}
+                                />
+                            </View>
+
+                            <Text style={styles.modalNewChatTitle}>NEW CHAT</Text>
+
+                            {loadingMembers ? (
+                                <ActivityIndicator style={{ marginTop: 40 }} size="large" color={COLORS.primary} />
+                            ) : (
+                                <FlatList
+                                    data={filteredMembers}
+                                    keyExtractor={(item) => item.id}
+                                    renderItem={renderMemberItem}
+                                    contentContainerStyle={styles.membersList}
+                                    ListEmptyComponent={() => (
+                                        <Text style={styles.membersEmptyText}>No members found.</Text>
+                                    )}
+                                />
+                            )}
                         </View>
-
-                        <Text style={styles.modalNewChatTitle}>NEW CHAT</Text>
-
-                        {loadingMembers ? (
-                            <ActivityIndicator style={{ marginTop: 40 }} size="large" color={COLORS.primary} />
-                        ) : (
-                            <FlatList
-                                data={filteredMembers}
-                                keyExtractor={(item) => item.id}
-                                renderItem={renderMemberItem}
-                                contentContainerStyle={styles.membersList}
-                                ListEmptyComponent={() => (
-                                    <Text style={styles.membersEmptyText}>No members found.</Text>
-                                )}
-                            />
-                        )}
                     </View>
-                </View>
+                </TouchableWithoutFeedback>
             </ModalSheet>
 
             {/* Options Selection Modal */}
@@ -650,65 +762,60 @@ const ChatList = ({ navigation }: any) => {
                     </View>
                 }
             >
-                <View
-                    style={{ flex: 1, marginTop: keyboardHeight > 0 ? (Platform.OS === 'ios' ? 85 : 50) : 0 }}
-                >
-                    <View style={styles.modalContent}>
-                        <Text style={[styles.modalNewChatTitle, { marginTop: 60 }]}>CREATE GROUP</Text>
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                    <View
+                        style={{ flex: 1, marginTop: keyboardHeight > 0 ? (Platform.OS === 'ios' ? 85 : 50) : 0 }}
+                    >
+                        <View style={styles.modalContent}>
+                            <Text style={[styles.modalNewChatTitle, { marginTop: 60 }]}>CREATE GROUP</Text>
 
-                        <View style={styles.groupInputContainer}>
-                            <TextInput
-                                style={styles.groupNameInput}
-                                placeholder="Group Name"
-                                placeholderTextColor={COLORS.textSecondary}
-                                value={groupName}
-                                onChangeText={setGroupName}
-                            />
-                        </View>
+                            <View style={styles.groupInputContainer}>
+                                <TextInput
+                                    style={styles.groupNameInput}
+                                    placeholder="Group Name"
+                                    placeholderTextColor={COLORS.textSecondary}
+                                    value={groupName}
+                                    onChangeText={setGroupName}
+                                />
+                            </View>
 
-                        <View style={[styles.modalSearchBar, { marginTop: 10 }]}>
-                            <SearchIcon width={20} height={20} color={COLORS.textSecondary} />
-                            <TextInput
-                                style={styles.modalSearchInput}
-                                placeholder="Search Members"
-                                placeholderTextColor={COLORS.textSecondary}
-                                value={memberSearchQuery}
-                                onChangeText={setMemberSearchQuery}
-                            />
-                        </View>
+                            <View style={[styles.modalSearchBar, { marginTop: 10 }]}>
+                                <SearchIcon width={20} height={20} color={COLORS.textSecondary} />
+                                <TextInput
+                                    style={styles.modalSearchInput}
+                                    placeholder="Search Members"
+                                    placeholderTextColor={COLORS.textSecondary}
+                                    value={memberSearchQuery}
+                                    onChangeText={setMemberSearchQuery}
+                                />
+                            </View>
 
-                        {loadingMembers ? (
-                            <ActivityIndicator style={{ marginTop: 40 }} size="large" color={COLORS.primary} />
-                        ) : (
-                            <FlatList
-                                data={filteredMembers}
-                                keyExtractor={(item) => item.id}
-                                renderItem={renderMemberSelectionItem}
-                                contentContainerStyle={[styles.membersList, { paddingBottom: 100 }]}
-                                ListEmptyComponent={() => (
-                                    <Text style={styles.membersEmptyText}>No members found.</Text>
-                                )}
-                            />
-                        )}
+                            {loadingMembers ? (
+                                <ActivityIndicator style={{ marginTop: 40 }} size="large" color={COLORS.primary} />
+                            ) : (
+                                <FlatList
+                                    data={filteredMembers}
+                                    keyExtractor={(item) => item.id}
+                                    renderItem={renderMemberSelectionItem}
+                                    contentContainerStyle={[styles.membersList, { paddingBottom: 100 }]}
+                                    ListEmptyComponent={() => (
+                                        <Text style={styles.membersEmptyText}>No members found.</Text>
+                                    )}
+                                />
+                            )}
 
-                        <View style={styles.createGroupFooter}>
-                            <TouchableOpacity
-                                style={[
-                                    styles.createGroupButton,
-                                    (!groupName.trim() || selectedMemberIds.length === 0 || creatingGroup) && styles.createGroupButtonDisabled
-                                ]}
-                                onPress={createGroupChat}
-                                disabled={!groupName.trim() || selectedMemberIds.length === 0 || creatingGroup}
-                            >
-                                {creatingGroup ? (
-                                    <ActivityIndicator color={COLORS.white} />
-                                ) : (
-                                    <Text style={styles.createGroupButtonText}>Create Group</Text>
-                                )}
-                            </TouchableOpacity>
+                            <View style={styles.createGroupFooter}>
+                                <Button
+                                    title="CREATE GROUP"
+                                    onPress={createGroupChat}
+                                    disabled={!groupName.trim() || selectedMemberIds.length === 0 || creatingGroup}
+                                    loading={creatingGroup}
+                                    style={styles.createGroupButtonOverrides}
+                                />
+                            </View>
                         </View>
                     </View>
-                </View>
+                </TouchableWithoutFeedback>
             </ModalSheet>
         </SafeAreaView>
     );
@@ -808,6 +915,33 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         letterSpacing: 0.5,
     },
+    tabContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 20,
+        marginBottom: 16,
+        gap: 12,
+    },
+    filterTab: {
+        paddingVertical: 6,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        backgroundColor: COLORS.white,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    filterTabActive: {
+        backgroundColor: COLORS.primary,
+        borderColor: COLORS.primary,
+    },
+    filterTabText: {
+        fontFamily: FONT_BODY,
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
+    },
+    filterTabTextActive: {
+        color: COLORS.white,
+    },
     content: {
         flex: 1,
         paddingHorizontal: 20,
@@ -857,6 +991,7 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         paddingHorizontal: 10,
         marginBottom: 8,
+        marginHorizontal: 4,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.04,
@@ -958,6 +1093,25 @@ const styles = StyleSheet.create({
         fontWeight: '400',
         color: COLORS.textSecondary,
         minWidth: 0,
+    },
+    rightActionContainer: {
+        width: 80,
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingBottom: 8,
+    },
+    rightAction: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    deleteCircle: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: COLORS.error,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     unreadBadge: {
         backgroundColor: COLORS.primary,
@@ -1061,7 +1215,7 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.white,
         marginHorizontal: 16,
         marginBottom: 8,
-        borderRadius: 12,
+        borderRadius: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.03,
@@ -1144,7 +1298,7 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     memberItemSelected: {
-        backgroundColor: '#E8F5E9',
+        backgroundColor: Platform.OS === 'ios' ? '#065AD71A' : '#E8F5E9',
     },
     checkbox: {
         width: 24,
@@ -1176,20 +1330,10 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#EEEEEE',
     },
-    createGroupButton: {
-        backgroundColor: COLORS.primary,
-        borderRadius: 12,
-        paddingVertical: 16,
-        alignItems: 'center',
-    },
-    createGroupButtonDisabled: {
-        opacity: 0.5,
-    },
-    createGroupButtonText: {
-        fontFamily: FONT_BODY,
-        fontSize: 16,
-        fontWeight: '700',
-        color: COLORS.white,
+    createGroupButtonOverrides: {
+        width: '90%',
+        borderRadius: 30, // Make it a pill shape like the new design
+        alignSelf: 'center',
     },
 });
 

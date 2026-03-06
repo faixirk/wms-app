@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Image, TouchableOpacity, ImageSourcePropType } 
 import { COLORS } from '../constants/colors';
 import { FONT_HEADING, FONT_BODY } from '../constants/fonts';
 import { CutoutCard } from './CutoutCard';
-import { CalenderIcon, InprogressClockIcon, FlagHighIcon } from '../assets/svgs';
+import { CalenderIcon, InprogressClockIcon, FlagHighIcon, ProjectIcon } from '../assets/svgs';
 
 export interface BadgeConfig {
     label: string;
@@ -23,6 +23,7 @@ export interface FocusCardProps {
     statusBadgeConfig?: BadgeConfig;
     priorityBadgeConfig?: BadgeConfig;
     avatars?: AvatarProp[];
+    projectName?: string;
     extraAvatarsCount?: number;
     actionNode?: React.ReactNode;
     children?: React.ReactNode;
@@ -33,6 +34,7 @@ const FocusCard: React.FC<FocusCardProps> = ({
     dateText,
     statusBadgeConfig,
     priorityBadgeConfig,
+    projectName,
     avatars = [],
     extraAvatarsCount = 0,
     actionNode,
@@ -68,11 +70,21 @@ const FocusCard: React.FC<FocusCardProps> = ({
                     )}
                 </View>
 
-                {/* Middle Row: Date (Only if it has status Badge -> Task) */}
-                {statusBadgeConfig && dateText && (
-                    <View style={styles.dateRow}>
-                        <CalenderIcon width={14} height={14} />
-                        <Text style={styles.dateText}>{dateText}</Text>
+                {/* Middle Row: Date (Only if it has status Badge -> Task) and Project Name */}
+                {statusBadgeConfig && (dateText || projectName) && (
+                    <View style={styles.dateProjectRow}>
+                        {dateText && (
+                            <View style={styles.dateRow}>
+                                <CalenderIcon width={14} height={14} />
+                                <Text style={styles.dateText}>{dateText}</Text>
+                            </View>
+                        )}
+                        {projectName && (
+                            <View style={styles.projectRow}>
+                                <ProjectIcon width={16} height={16} />
+                                <Text style={styles.projectText} numberOfLines={1}>{projectName}</Text>
+                            </View>
+                        )}
                     </View>
                 )}
 
@@ -185,10 +197,17 @@ const styles = StyleSheet.create({
         color: '#475467',
         fontWeight: '700',
     },
-    dateRow: {
+    dateProjectRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 8,
+        justifyContent: 'space-between',
+        marginBottom: 12,
+        paddingRight: 60, // Keep text away from action button area
+    },
+    dateRow: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
         gap: 8,
     },
     dateText: {
@@ -196,6 +215,20 @@ const styles = StyleSheet.create({
         fontFamily: FONT_BODY,
         color: COLORS.black,
         fontWeight: '600',
+    },
+    projectRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flex: 1,
+        marginLeft: 16,
+    },
+    projectText: {
+        fontSize: 13,
+        fontFamily: FONT_BODY,
+        color: COLORS.black,
+        fontWeight: '600',
+        flexShrink: 1, // Allow text to truncate if too long
     },
     bottomRow: {
         flexDirection: 'row',

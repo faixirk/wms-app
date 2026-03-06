@@ -9,12 +9,13 @@ import { COLORS } from '../../constants/colors';
 import { FONT_HEADING, FONT_BODY } from '../../constants/fonts';
 import { ChatIcon, BellIcon, ArrowUpRightIcon, LightningIcon, VideoCamIcon, InprogressClockIcon, FlagHighIcon } from '../../assets/svgs';
 import { taskTimer, noTaskImg, todayMeetImg, cameraImg, startTimerIcon, stopTimerIcon, deleteTimerIcon } from '../../assets/images';
-import { CutoutCard, FocusCard } from '../../components';
+import { CutoutCard, FocusCard, ProfileSheet, LogoutConfirmationSheet } from '../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SCREENS } from '../../constants/screens';
-import { useAppSelector } from '../../hooks';
+import { useAppSelector, useAppDispatch } from '../../hooks';
 import request from '../../services/network/request';
 import ENDPOINTS from '../../constants/endpoints';
+import { logout } from '../../redux/slices/auth';
 
 
 
@@ -58,7 +59,10 @@ const EmptyStateCard = ({ imageSource, title, description }: { imageSource: any;
 );
 
 const Home = ({ navigation }: any) => {
+    const dispatch = useAppDispatch();
     const [isTimerExpanded, setIsTimerExpanded] = useState(false);
+    const [isProfileSheetVisible, setProfileSheetVisible] = useState(false);
+    const [isLogoutSheetVisible, setLogoutSheetVisible] = useState(false);
     const [todayTasks, setTodayTasks] = useState<any[]>([]);
     const [totalTasks, setTotalTasks] = useState(0);
     const { selectedWorkspaceId, user } = useAppSelector((state) => state.auth);
@@ -82,11 +86,12 @@ const Home = ({ navigation }: any) => {
             const tasks = dataObj?.tasks;
             if (tasks && Array.isArray(tasks)) {
                 setTodayTasks(tasks);
-                if (dataObj.totalTasks !== undefined) {
-                    setTotalTasks(dataObj.totalTasks);
-                } else {
-                    setTotalTasks(tasks.length);
-                }
+                // Calculate remaining tasks (todo or backlog)
+                const remainingCount = tasks.filter((t: any) => {
+                    const status = t?.workState?.name?.toLowerCase() || '';
+                    return status === 'todo' || status === 'backlog';
+                }).length;
+                setTotalTasks(remainingCount);
             }
         } catch (error) {
             console.log('Failed to fetch today tasks:', error);
@@ -110,16 +115,18 @@ const Home = ({ navigation }: any) => {
 
                 {/* Header Profile Row */}
                 <View style={styles.headerRow}>
-                    {userAvatarUri ? (
-                        <Image
-                            source={{ uri: userAvatarUri }}
-                            style={styles.avatar}
-                        />
-                    ) : (
-                        <View style={styles.headerAvatarPlaceholder}>
-                            <Text style={styles.headerAvatarInitial}>{headerInitial}</Text>
-                        </View>
-                    )}
+                    <TouchableOpacity activeOpacity={0.8} onPress={() => setProfileSheetVisible(true)}>
+                        {userAvatarUri ? (
+                            <Image
+                                source={{ uri: userAvatarUri }}
+                                style={styles.avatar}
+                            />
+                        ) : (
+                            <View style={styles.headerAvatarPlaceholder}>
+                                <Text style={styles.headerAvatarInitial}>{headerInitial}</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
                     <View style={styles.headerIcons}>
                         {/* <TouchableOpacity style={styles.iconCircle} onPress={() => navigation?.navigate(SCREENS.CHAT_LIST)}>
                             <ChatIcon width={20} height={20} />
@@ -149,7 +156,7 @@ const Home = ({ navigation }: any) => {
                     >
                         <View style={styles.remainingTasksContent}>
                             <Text style={styles.remainingTasksTitle}>REMAINING TASKS</Text>
-                            <Text style={styles.remainingTasksCount}>{'0'}</Text>
+                            <Text style={styles.remainingTasksCount}>{totalTasks.toString()}</Text>
                         </View>
 
                         <TouchableOpacity style={styles.blackPillButton} activeOpacity={0.8}>
@@ -203,6 +210,7 @@ const Home = ({ navigation }: any) => {
                                 key={task.id}
                                 title={task.name}
                                 dateText={dateText}
+                                projectName={task.project?.name}
                                 statusBadgeConfig={statusBadgeConfig}
                                 priorityBadgeConfig={priorityBadgeConfig}
                                 avatars={avatars}
@@ -261,6 +269,29 @@ const Home = ({ navigation }: any) => {
                 {/* Spacer for bottom tab bar */}
                 <View style={{ height: 100 }} />
             </ScrollView>
+
+            {/* Profile Bottom Sheet */}
+            <ProfileSheet
+                visible={isProfileSheetVisible}
+                onClose={() => setProfileSheetVisible(false)}
+                onSelectWorkspace={() => navigation.navigate(SCREENS.WORKSPACE)}
+                onLogoutPress={() => {
+                    setProfileSheetVisible(false);
+                    setTimeout(() => {
+                        setLogoutSheetVisible(true);
+                    }, 300);
+                }}
+            />
+
+            {/* Logout Confirmation Sheet */}
+            <LogoutConfirmationSheet
+                visible={isLogoutSheetVisible}
+                onClose={() => setLogoutSheetVisible(false)}
+                onConfirm={() => {
+                    setLogoutSheetVisible(false);
+                    dispatch(logout());
+                }}
+            />
 
             {/* Floating Timer Button Wrapper */}
             {/* <View style={[styles.timerWrapper, isTimerExpanded && styles.timerWrapperExpanded]}>

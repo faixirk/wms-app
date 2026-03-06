@@ -78,7 +78,8 @@ const WorkspaceScreen = () => {
         const isSelected = item.id === selectedId;
 
         const cardColors = ['#6964F8', '#FA5A5A', '#FFB038', '#20B2AA']; // Array of 4 distinct colors
-        const bgColor = cardColors[index % cardColors.length];
+        const bgColor = isSelected ? cardColors[index % cardColors.length] : COLORS.white;
+        const textColor = isSelected ? COLORS.white : COLORS.black;
 
         return (
             <TouchableOpacity
@@ -102,7 +103,7 @@ const WorkspaceScreen = () => {
                     <View style={styles.cardContent}>
                         <Text style={styles.iconEmoji}>🏢</Text>
 
-                        <Text style={styles.cardTitle}>{item.name}</Text>
+                        <Text style={[styles.cardTitle, { color: textColor }]}>{item.name}</Text>
                     </View>
                 </CutoutCard>
 
@@ -234,7 +235,7 @@ const styles = StyleSheet.create({
     },
     cardTitle: {
         fontFamily: FONT_HEADING,
-        fontSize: 24,
+        fontSize: 28,
         color: COLORS.white,
         letterSpacing: -1,
     },

@@ -1,4 +1,5 @@
 import { StatusBar, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
@@ -48,12 +49,14 @@ function App() {
 
 function AppContent() {
   return (
-    <SafeAreaProvider>
-      <View style={styles.container}>
-        <StatusBar backgroundColor={COLORS.background} barStyle="dark-content" />
-        <Root />
-      </View>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <View style={styles.container}>
+          <StatusBar backgroundColor={COLORS.background} barStyle="dark-content" />
+          <Root />
+        </View>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

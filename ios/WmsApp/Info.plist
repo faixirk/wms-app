@@ -34,7 +34,9 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>WmsApp needs camera access for video calls.</string>
+	<string>WmsApp needs camera access for video calls and capturing photos for chat attachments.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>WmsApp needs access to your photo library to let you select and send photos/videos in chats.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>WmsApp needs location access to provide location-based services and improve your experience.</string>
 	<key>NSMicrophoneUsageDescription</key>

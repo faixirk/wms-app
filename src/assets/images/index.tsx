@@ -24,3 +24,5 @@ export const addImg = require('../images/add_workspace.png');
 export const emptyChatImg = require('../images/empty_chat_img.png');
 export const newChatLogo = require('../images/new_chat_logo.png');
 export const newGroupLogo = require('../images/create_group_logo.png');
+export const workspaceSheetLogo = require('../images/workspace_sheet_logo.png');
+export const logoutSheetLogo = require('../images/logout_sheet_logo.png');

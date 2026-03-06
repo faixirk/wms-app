@@ -31,4 +31,4 @@ export { default as StopIcon } from './stop_icon.svg';
 export { default as PauseIcon } from './pause_icon.svg';
 export { default as CloseIcon } from './close_icon.svg';
 export { default as PhoneIcon } from './phone_icon.svg';
-export { default as CallIcon } from './call.svg';
+export { default as CallIcon } from './call.svg';export { default as ProjectIcon } from './project_icon.svg';

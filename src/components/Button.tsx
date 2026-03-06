@@ -6,6 +6,7 @@ import {
   View,
   ViewStyle,
   StyleProp,
+  ActivityIndicator,
 } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { FONT_HEADING, TYPOGRAPHY_BODY_MEDIUM } from '../constants/fonts';
@@ -21,6 +22,7 @@ export interface ButtonProps {
   leftIcon?: React.ReactNode;
   onPress: () => void;
   disabled?: boolean;
+  loading?: boolean;
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
 }
@@ -32,6 +34,7 @@ const Button = ({
   leftIcon,
   onPress,
   disabled = false,
+  loading = false,
   style,
   contentStyle,
 }: ButtonProps) => {
@@ -41,28 +44,34 @@ const Button = ({
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
+      disabled={disabled || loading}
       style={({ pressed }) => [
         styles.base,
         isPrimary ? styles.primary : styles.outline,
-        disabled && styles.disabled,
+        (disabled || loading) && styles.disabled,
         pressed && styles.pressed,
         style,
       ]}
     >
       <View style={[styles.content, contentStyle]}>
-        {leftIcon ? <View style={styles.leftIcon}>{leftIcon}</View> : null}
-        <Text
-          style={[
-            styles.title,
-            useBodyTypography && styles.titleBodyMedium,
-            isPrimary ? styles.titlePrimary : styles.titleOutline,
-            disabled && styles.titleDisabled,
-          ]}
-          numberOfLines={1}
-        >
-          {title}
-        </Text>
+        {loading ? (
+          <ActivityIndicator color={isPrimary ? COLORS.white : COLORS.primary} />
+        ) : (
+          <>
+            {leftIcon ? <View style={styles.leftIcon}>{leftIcon}</View> : null}
+            <Text
+              style={[
+                styles.title,
+                useBodyTypography && styles.titleBodyMedium,
+                isPrimary ? styles.titlePrimary : styles.titleOutline,
+                disabled && styles.titleDisabled,
+              ]}
+              numberOfLines={1}
+            >
+              {title}
+            </Text>
+          </>
+        )}
       </View>
     </Pressable>
   );

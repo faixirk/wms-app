@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAppSelector } from '../hooks';
 import {
     View,
     TouchableOpacity,
@@ -31,6 +32,10 @@ const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => 
     const isAndroid13OrAbove = Platform.OS === 'android' && (Platform.Version as number) >= 33;
     const bottomInset = isAndroid13OrAbove ? insets.bottom : 0;
     const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+    // Calculate total unread chat messages
+    const chats = useAppSelector((state) => state.chat?.chats || []);
+    const totalUnreadCount = chats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
 
     useEffect(() => {
         const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -138,6 +143,13 @@ const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => 
                                     ]}
                                     resizeMode="contain"
                                 />
+                                {route.name === SCREENS.CHAT_LIST && totalUnreadCount > 0 && (
+                                    <View style={styles.badgeContainer}>
+                                        <Text style={styles.badgeText} numberOfLines={1}>
+                                            {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
                             {isFocused && (
                                 <Text
@@ -197,6 +209,26 @@ const styles = StyleSheet.create({
     icon: {
         width: 24,
         height: 24,
+    },
+    badgeContainer: {
+        position: 'absolute',
+        top: -6,
+        right: -10,
+        backgroundColor: '#FF3B30',
+        borderRadius: 10,
+        minWidth: 18,
+        height: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+        borderWidth: 1.5,
+        borderColor: '#FFFFFF',
+    },
+    badgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: 'bold',
+        textAlign: 'center',
     },
     label: {
         fontSize: 12,

@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     View, Text, StyleSheet, ImageBackground, Image, TouchableOpacity, TextInput,
     FlatList, KeyboardAvoidingView, Keyboard, Platform, ActivityIndicator, Alert, PermissionsAndroid,
-    Modal, Linking, Dimensions, Animated, ScrollView
+    Modal, Linking, Dimensions, Animated, ScrollView, PanResponder
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import DocumentPicker from 'react-native-document-picker';
 import { ArrowWhiteLeftIcon, CalenderBlueIcon, ChatVideoCamIcon, SendPaperplaneIcon, MicIcon, AttachmentIcon, PlayButtonIcon, StopIcon, PauseIcon, CloseIcon, PhoneIcon, CallIcon, ArrowLeftIcon, FlagHighIcon, BellIcon, EmailIcon } from '../../assets/svgs';
+import { Trash } from 'iconsax-react-native';
 import { chatScreenBg, newGroupLogo } from '../../assets/images';
 import { COLORS } from '../../constants/colors';
 import { FONT_HEADING, FONT_BODY } from '../../constants/fonts';
@@ -17,6 +18,7 @@ import { socketService } from '../../services/network/socket';
 import { uploadFile } from '../../services/network/upload';
 import { useSound } from 'react-native-nitro-sound';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useCall } from '../../context/CallContext';
 import Svg, { Path } from 'react-native-svg';
 import request from '../../services/network/request';
@@ -154,8 +156,8 @@ const AudioMessagePlayer = ({ url, isSent, duration: initialDuration = 0, messag
                 : formatDurationMs(totalMs))
         : '0:00';
 
-    const trackColor = isSent ? '#EAEAEA' : 'rgba(255,255,255,0.4)';
-    const playedColor = COLORS.primary;
+    const trackColor = isSent ? 'rgba(255,255,255,0.4)' : '#EAEAEA';
+    const playedColor = isSent ? COLORS.white : COLORS.primary;
 
     return (
         <View style={styles.audioBubbleContainer}>
@@ -194,20 +196,26 @@ const AudioMessagePlayer = ({ url, isSent, duration: initialDuration = 0, messag
             </View>
             <TouchableOpacity onPress={playPause} activeOpacity={0.8} style={{
                 justifyContent: 'center', alignItems: 'center', width: 28, height: 28, borderRadius: 14,
-                backgroundColor: isSent ? '#EAEAEA' : 'rgba(255,255,255,0.2)'
+                backgroundColor: isSent ? 'rgba(255,255,255,0.2)' : 'transparent'
             }}>
                 {state.isPlaying && currentPlayingAudioUrl === url ? (
-                    <PauseIcon width={16} height={16} color={isSent ? '#1366D9' : '#FFF'} />
+                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: isSent ? 'transparent' : COLORS.primary, justifyContent: 'center', alignItems: 'center' }}>
+                        <PauseIcon width={12} height={12} color={COLORS.white} />
+                    </View>
+                ) : isSent ? (
+                    <Svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ marginLeft: 2 }}>
+                        <Path d="M9.5 8.5L16.5 12L9.5 15.5V8.5Z" fill="white" />
+                    </Svg>
                 ) : (
                     <PlayButtonIcon width={28} height={28} />
                 )}
             </TouchableOpacity>
             <View style={styles.audioTimeAndSpeed}>
-                <Text style={{ fontSize: 10, color: isSent ? '#1366D9' : '#FFF', minWidth: 40, textAlign: 'right' }}>
+                <Text style={{ fontSize: 10, color: isSent ? '#FFF' : '#8E8E93', minWidth: 40, textAlign: 'right' }}>
                     {durationLabel}
                 </Text>
-                <TouchableOpacity onPress={cycleSpeed} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} style={styles.speedChip}>
-                    <Text style={[styles.speedChipText, { color: isSent ? '#1366D9' : '#FFF' }]}>{speed}x</Text>
+                <TouchableOpacity onPress={cycleSpeed} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} style={[styles.speedChip, { backgroundColor: isSent ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]}>
+                    <Text style={[styles.speedChipText, { color: isSent ? '#FFF' : '#8E8E93' }]}>{speed}x</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -247,14 +255,118 @@ const ChatRoom = () => {
     const [infoActiveTab, setInfoActiveTab] = useState<'Members' | 'Files' | 'Media' | 'Links'>('Members');
     const [inAppNotifEnabled, setInAppNotifEnabled] = useState(true);
     const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(false);
+    const [attachmentOptionsVisible, setAttachmentOptionsVisible] = useState(false);
 
     // Typing state
     const [typingUsers, setTypingUsers] = useState<Record<string, ReturnType<typeof setTimeout>>>({});
+
+    // Voice Recording Gestures
+    const micPan = useRef(new Animated.ValueXY()).current;
+    const isRecordingRef = useRef(false);
+    const isCanceledRef = useRef(false);
+    const SWIPE_CANCEL_THRESHOLD = -100;
+
+    const panResponder = useMemo(() => PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: async () => {
+            isCanceledRef.current = false;
+
+            if (Platform.OS === 'android') {
+                try {
+                    const granted = await PermissionsAndroid.request(
+                        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+                        {
+                            title: 'Audio Recording Permission',
+                            message: 'App needs access to your microphone to record audio.',
+                            buttonNeutral: 'Ask Me Later',
+                            buttonNegative: 'Cancel',
+                            buttonPositive: 'OK',
+                        }
+                    );
+                    if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+                        Alert.alert('Permission Denied', 'Microphone permission is required to record audio messages.');
+                        return;
+                    }
+                } catch (err) {
+                    console.warn(err);
+                    return;
+                }
+            }
+
+            try {
+                if (!isRecordingRef.current) {
+                    await startRecorder();
+                    setIsRecording(true);
+                    isRecordingRef.current = true;
+                    setRecordTime(0);
+                }
+            } catch (e: any) {
+                console.log('Failed to start recording', e);
+                Alert.alert('Error', 'Failed to start recording: ' + (e.message || String(e)));
+                isRecordingRef.current = false;
+                setIsRecording(false);
+            }
+        },
+        onPanResponderMove: (_, gestureState) => {
+            if (isCanceledRef.current) return;
+
+            // Only allow dragging left
+            if (gestureState.dx < 0) {
+                micPan.setValue({ x: gestureState.dx, y: 0 });
+            }
+
+            // If swiped far enough left, cancel
+            if (gestureState.dx < SWIPE_CANCEL_THRESHOLD) {
+                isCanceledRef.current = true;
+                handleCancelRecording();
+                Animated.spring(micPan, {
+                    toValue: { x: 0, y: 0 },
+                    useNativeDriver: false,
+                }).start();
+            }
+        },
+        onPanResponderRelease: async () => {
+            if (!isCanceledRef.current && isRecordingRef.current) {
+                await handleStopRecording();
+            }
+
+            Animated.spring(micPan, {
+                toValue: { x: 0, y: 0 },
+                useNativeDriver: false,
+            }).start();
+        },
+        onPanResponderTerminate: () => {
+            handleCancelRecording();
+            Animated.spring(micPan, {
+                toValue: { x: 0, y: 0 },
+                useNativeDriver: false,
+            }).start();
+        }
+    }), []);
+
+    const handleCancelRecording = async () => {
+        if (!isRecordingRef.current) return;
+        try {
+            await stopRecorder(); // Just stop it and throw away the URI
+        } catch (e) {
+            console.log('Error canceling recording', e);
+        } finally {
+            isRecordingRef.current = false;
+            setIsRecording(false);
+            setRecordTime(0);
+        }
+    };
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isTypingRef = useRef<boolean>(false);
 
     // Message Status Tracking
     const [messageStatuses, setMessageStatuses] = useState<Record<string, string>>({});
+    const [participantsLastReadAt, setParticipantsLastReadAt] = useState<Record<string, string>>({});
+
+    // Mentions Tracking
+    const [cursorPosition, setCursorPosition] = useState(0);
+    const [mentionKeyword, setMentionKeyword] = useState<string | null>(null);
 
     // Dynamic Keyboard Height
     const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -273,10 +385,62 @@ const ChatRoom = () => {
     const isGroup = currentChat ? currentChat.type !== 'DIRECT' : false;
 
     useEffect(() => {
-        if (!isGroup && infoActiveTab === 'Members') {
+        if (currentChat?.participants) {
+            const readAts: Record<string, string> = {};
+            currentChat.participants.forEach((p: any) => {
+                // Aggressively find lastReadAt in case it is nested in an ORM pivot object
+                const pLastReadAt = p.lastReadAt || p.chatParticipant?.lastReadAt || p.ChatParticipant?.lastReadAt || p.pivot?.lastReadAt || p.participant?.lastReadAt;
+                if (pLastReadAt && p.id !== userId) {
+                    readAts[p.id] = pLastReadAt;
+                }
+            });
+            setParticipantsLastReadAt(prev => ({ ...prev, ...readAts }));
+        }
+    }, [currentChat?.participants, userId]);
+
+    useEffect(() => {
+        if (!isGroup) {
             setInfoActiveTab('Files');
         }
     }, [isGroup, infoActiveTab]);
+
+    useEffect(() => {
+        if (!isGroup) {
+            setMentionKeyword(null);
+            return;
+        }
+        const textBeforeCursor = message.slice(0, cursorPosition);
+        const match = textBeforeCursor.match(/(?:^|\s)@([\w.-]*)$/);
+        if (match) {
+            setMentionKeyword(match[1]);
+        } else {
+            setMentionKeyword(null);
+        }
+    }, [message, cursorPosition, isGroup]);
+
+    const filteredMentions = useMemo(() => {
+        if (mentionKeyword === null || !currentChat?.participants) return [];
+        const keyword = mentionKeyword.toLowerCase();
+        return currentChat.participants.filter((p: any) => {
+            if (p.id === userId) return false;
+            const name = (p.username || p.name || '').toLowerCase();
+            return name.includes(keyword);
+        });
+    }, [mentionKeyword, currentChat?.participants, userId]);
+
+    const handleSelectMention = (participant: any) => {
+        const handle = participant.username || participant.name || 'User';
+        const textBeforeCursor = message.slice(0, cursorPosition);
+        const textAfterCursor = message.slice(cursorPosition);
+
+        const newTextBefore = textBeforeCursor.replace(/(?:^|\s)@([\w.-]*)$/, (match) => {
+            const leadingSpace = match.startsWith(' ') || match.startsWith('\n') ? match[0] : '';
+            return leadingSpace + `@${handle} `;
+        });
+
+        setMessage(newTextBefore + textAfterCursor);
+        setMentionKeyword(null);
+    };
 
     const messages = activeRoomMessages[chatId] || [];
     const isLoading = loadingMessages ? (loadingMessages[chatId] || false) : false;
@@ -333,8 +497,8 @@ const ChatRoom = () => {
             if (data.chatId === chatId) {
                 dispatch(addMessageToRoom(data));
 
-                // Hacky soft auto-scroll
-                setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+                // Hacky soft auto-scroll to bottom (now at offset: 0 because inverted={true})
+                setTimeout(() => flatListRef.current?.scrollToOffset({ offset: 0, animated: true }), 100);
 
                 // If a new message arrives from someone, they probably stopped typing
                 const newSenderId = data.message.senderId || data.message.sender?.id;
@@ -406,17 +570,25 @@ const ChatRoom = () => {
             }
         };
 
-        const handleRead = (data: { chatId: string, userId: string }) => {
+        const handleRead = (data: { chatId: string, userId: string, lastReadAt?: string }) => {
             if (data.chatId === chatId && data.userId !== userId) {
-                setMessageStatuses(prev => {
-                    const next = { ...prev };
-                    Object.keys(next).forEach(key => {
-                        if (next[key] === 'sent' || next[key] === 'delivered') {
-                            next[key] = 'read';
-                        }
+                if (data.lastReadAt) {
+                    setParticipantsLastReadAt(prev => ({
+                        ...prev,
+                        [data.userId]: data.lastReadAt!
+                    }));
+                } else {
+                    // Fallback to older legacy logic if lastReadAt is missing
+                    setMessageStatuses(prev => {
+                        const next = { ...prev };
+                        Object.keys(next).forEach(key => {
+                            if (next[key] === 'sent' || next[key] === 'delivered') {
+                                next[key] = 'read';
+                            }
+                        });
+                        return next;
                     });
-                    return next;
-                });
+                }
             }
         };
 
@@ -505,10 +677,21 @@ const ChatRoom = () => {
         // Optimistically track sending state
         setMessageStatuses(prev => ({ ...prev, [clientMsgId]: 'sending' }));
 
+        const mentIds: string[] = [];
+        if (isGroup && currentChat?.participants) {
+            currentChat.participants.forEach((p: any) => {
+                const handle = p.username || p.name;
+                if (handle && message.includes(`@${handle}`)) {
+                    mentIds.push(p.id);
+                }
+            });
+        }
+
         socketService.emit('chat:message:send', {
             chatId,
             content: message.trim(),
             clientMessageId: clientMsgId,
+            mentions: mentIds.length > 0 ? mentIds : undefined
         });
 
         // Cancel typing status abruptly
@@ -518,42 +701,10 @@ const ChatRoom = () => {
         setMessage('');
     };
 
-    const handleStartRecording = async () => {
-        if (Platform.OS === 'android') {
-            try {
-                const granted = await PermissionsAndroid.request(
-                    PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-                    {
-                        title: 'Audio Recording Permission',
-                        message: 'App needs access to your microphone to record audio.',
-                        buttonNeutral: 'Ask Me Later',
-                        buttonNegative: 'Cancel',
-                        buttonPositive: 'OK',
-                    }
-                );
-                if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-                    Alert.alert('Permission Denied', 'Microphone permission is required to record audio messages.');
-                    return;
-                }
-            } catch (err) {
-                console.warn(err);
-                return;
-            }
-        }
-
-        try {
-            await startRecorder();
-            setIsRecording(true);
-            setRecordTime(0);
-        } catch (e: any) {
-            console.log('Failed to start recording', e);
-            Alert.alert('Error', 'Failed to start recording: ' + (e.message || String(e)));
-        }
-    };
-
     const handleStopRecording = async () => {
         try {
             const uri = await stopRecorder();
+            isRecordingRef.current = false;
             setIsRecording(false);
             if (!uri) return;
 
@@ -600,26 +751,61 @@ const ChatRoom = () => {
         }
     };
 
-    const handlePickAttachment = async () => {
-        try {
-            const result = await DocumentPicker.pickSingle({
-                type: [DocumentPicker.types.allFiles],
-            });
+    const handlePickAttachment = () => {
+        setAttachmentOptionsVisible(true);
+    };
 
-            if (!result || !result.uri) return;
+    const handleSelectFiles = () => {
+        setAttachmentOptionsVisible(false);
+        setTimeout(async () => {
+            try {
+                const result = await DocumentPicker.pickSingle({
+                    type: [DocumentPicker.types.allFiles],
+                });
 
-            setPendingAttachment({
-                uri: result.uri,
-                name: result.name || 'attachment.file',
-                type: result.type || 'application/octet-stream',
-                size: result.size ?? undefined,
-            });
-        } catch (err: any) {
-            if (!DocumentPicker.isCancel(err)) {
-                console.error('attachment picker error', err);
-                Alert.alert('Error', 'Failed to pick attachment');
+                if (!result || !result.uri) return;
+
+                setPendingAttachment({
+                    uri: result.uri,
+                    name: result.name || 'attachment.file',
+                    type: result.type || 'application/octet-stream',
+                    size: result.size ?? undefined,
+                });
+            } catch (err: any) {
+                if (!DocumentPicker.isCancel(err)) {
+                    console.error('attachment picker error', err);
+                    Alert.alert('Error', 'Failed to pick attachment');
+                }
             }
-        }
+        }, 500);
+    };
+
+    const handleSelectPhotos = () => {
+        setAttachmentOptionsVisible(false);
+        setTimeout(async () => {
+            try {
+                const result = await launchImageLibrary({
+                    mediaType: 'mixed',
+                    quality: 0.8,
+                });
+
+                if (result.didCancel || !result.assets || result.assets.length === 0) return;
+
+                const asset = result.assets[0];
+                if (!asset.uri) return;
+
+                const name = asset.fileName || asset.uri.split('/').pop() || 'media.file';
+                setPendingAttachment({
+                    uri: asset.uri,
+                    name: name,
+                    type: asset.type || 'application/octet-stream',
+                    size: asset.fileSize ?? undefined,
+                });
+            } catch (err: any) {
+                console.error('image picker error', err);
+                Alert.alert('Error', 'Failed to pick photo/video');
+            }
+        }, 500);
     };
 
     const handleCancelPendingAttachment = () => {
@@ -919,7 +1105,53 @@ const ChatRoom = () => {
                                     ]}
                                     numberOfLines={showSeeMore ? 4 : undefined}
                                 >
-                                    {content}
+                                    {(() => {
+                                        const urlPattern = `https?:\\/\\/[^\\s]+`;
+
+                                        // Build dynamic mention regex from participants to handle spaces in names
+                                        const handles = currentChat?.participants?.map((p: any) => p.username || p.name).filter(Boolean).sort((a: string, b: string) => b.length - a.length) || [];
+                                        const escapedHandles = handles.map((h: string) => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+
+                                        // Match either an exact participant handle, or fallback to single word
+                                        const mentionPattern = escapedHandles.length > 0 ? `@(?:${escapedHandles})|@[\\w.-]+` : `@[\\w.-]+`;
+
+                                        const combinedRegex = new RegExp(`(${urlPattern}|${mentionPattern})`, 'g');
+                                        const exactUrlRegex = /^(https?:\/\/[^\s]+)$/;
+                                        const exactMentionRegex = new RegExp(`^(${mentionPattern})$`);
+
+                                        if (!combinedRegex.test(content)) {
+                                            return content;
+                                        }
+
+                                        const parts = content.split(combinedRegex);
+                                        return parts.map((part, index) => {
+                                            if (exactUrlRegex.test(part)) {
+                                                return (
+                                                    <Text
+                                                        key={index}
+                                                        style={{ textDecorationLine: 'underline' }}
+                                                        onPress={() => Linking.openURL(part).catch(err => console.error("Couldn't load page", err))}
+                                                    >
+                                                        {part}
+                                                    </Text>
+                                                );
+                                            } else if (exactMentionRegex.test(part)) {
+                                                // If there's a mentions array, you can also optionally verify if the mention text 
+                                                // matches a username from the array. Here we'll uniformly style any @word as a mention
+                                                // since the backend determines who actually gets notified, visually it helps to highlight it.
+                                                // If needed, check `item.mentions?.includes(...)` but raw usernames might not equal the exact string.
+                                                return (
+                                                    <Text
+                                                        key={index}
+                                                        style={{ fontWeight: 'bold', color: isSent ? '#E0E0E0' : '#1366D9' }}
+                                                    >
+                                                        {part}
+                                                    </Text>
+                                                );
+                                            }
+                                            return <Text key={index}>{part}</Text>;
+                                        });
+                                    })()}
                                 </Text>
                                 {(showSeeMore || showSeeLess) && (
                                     <TouchableOpacity
@@ -937,33 +1169,75 @@ const ChatRoom = () => {
                     })()}
 
                     {!isDeleted && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 4 }}>
-                        <Text style={{
-                            fontSize: 10,
-                            color: isSent ? '#5A5A5A' : 'rgba(255,255,255,0.7)',
-                            marginRight: isSent ? 4 : 0
-                        }}>
-                            {msgTime}
-                            {isEdited ? ' (edited)' : ''}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', marginTop: 4 }}>
+                            <Text style={{
+                                fontSize: 10,
+                                color: isSent ? 'rgba(255,255,255,0.7)' : '#5A5A5A',
+                                marginRight: isSent ? 4 : 0
+                            }}>
+                                {msgTime}
+                                {isEdited ? ' (edited)' : ''}
+                            </Text>
 
-                        {isSent && (() => {
-                            // Backend might have `status` natively, fallback to `messageStatuses` tracker, or default to `sent`
-                            const status = messageStatuses[item.id] || (item as any).status || 'sent';
+                            {isSent && (() => {
+                                const messageCreatedAt = new Date(item.createdAt).getTime();
 
-                            let icon = <Text style={{ fontSize: 10, color: '#8E8E93', fontWeight: 'bold' }}>✓</Text>;
+                                // Target Participants
+                                const otherParticipants = currentChat?.participants?.filter((p: any) => p.id !== userId) || [];
+                                const totalOthers = otherParticipants.length || 1;
 
-                            if (status === 'read') {
-                                icon = <Text style={{ fontSize: 10, color: '#1366D9', fontWeight: 'bold' }}>✓✓</Text>;
-                            } else if (status === 'delivered') {
-                                icon = <Text style={{ fontSize: 10, color: '#8E8E93', fontWeight: 'bold' }}>✓✓</Text>;
-                            } else if (status === 'sending') {
-                                icon = <ActivityIndicator size="small" color="#8E8E93" style={{ transform: [{ scale: 0.5 }] }} />;
-                            }
+                                let readCount = 0;
 
-                            return icon;
-                        })()}
-                    </View>
+                                for (const p of otherParticipants) {
+                                    const pId = p.id;
+                                    if (participantsLastReadAt[pId]) {
+                                        const pReadAt = new Date(participantsLastReadAt[pId]).getTime();
+                                        if (messageCreatedAt <= pReadAt) {
+                                            readCount++;
+                                        }
+                                    }
+                                }
+
+                                const isReadByAll = totalOthers > 0 && readCount === totalOthers;
+                                const isReadByAnyone = readCount > 0;
+
+                                // Native fallback statuses from DB
+                                const nativeIsRead = item.isRead === true;
+                                const trackedStatus = messageStatuses[item.id] || (item as any).status || 'sent';
+
+                                let finalStatus = trackedStatus;
+
+                                // Group vs Direct Logic
+                                const isRead = isGroup ? isReadByAll : (isReadByAnyone || nativeIsRead);
+
+                                if (isRead || trackedStatus === 'read') {
+                                    finalStatus = 'read';
+                                } else if (trackedStatus === 'delivered') {
+                                    finalStatus = 'delivered';
+                                } else if (trackedStatus === 'sent') {
+                                    // For historical messages, infer 'delivered' if recipient is online
+                                    // In groups, ideally wait until all are delivered, but evaluating onlineCount:
+                                    if (!isGroup && isOnline) {
+                                        finalStatus = 'delivered';
+                                    } else if (isGroup && onlineCount > 1) { // 1 is us, >1 means someone else is online
+                                        // Simplified: show double grey if anyone is online in the group
+                                        finalStatus = 'delivered';
+                                    }
+                                }
+
+                                let icon = <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>✓</Text>;
+
+                                if (finalStatus === 'read') {
+                                    icon = <Text style={{ fontSize: 10, color: '#34B7F1', fontWeight: 'bold' }}>✓✓</Text>;
+                                } else if (finalStatus === 'delivered') {
+                                    icon = <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: 'bold' }}>✓✓</Text>;
+                                } else if (finalStatus === 'sending') {
+                                    icon = <ActivityIndicator size="small" color="rgba(255,255,255,0.5)" style={{ transform: [{ scale: 0.5 }] }} />;
+                                }
+
+                                return icon;
+                            })()}
+                        </View>
                     )}
                 </View>
             </TouchableOpacity>
@@ -1422,6 +1696,34 @@ const ChatRoom = () => {
                     </TouchableOpacity>
                 </ModalSheet>
 
+                {/* Attachment Options Modal */}
+                <ModalSheet
+                    visible={attachmentOptionsVisible}
+                    onClose={() => setAttachmentOptionsVisible(false)}
+                    heightFraction={0.24}
+                    dismissOnOverlayPress={true}
+                >
+                    <Text style={styles.reportSheetTitle}>Select Attachment</Text>
+                    <TouchableOpacity
+                        style={styles.headerOptionSheetItem}
+                        onPress={handleSelectFiles}
+                        activeOpacity={0.7}
+                    >
+                        <AttachmentIcon width={24} height={24} color="#000" />
+                        <Text style={[styles.headerOptionText, { marginLeft: 10 }]}>Select from Files</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.headerOptionSheetItem}
+                        onPress={handleSelectPhotos}
+                        activeOpacity={0.7}
+                    >
+                        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+                            <Path d="M21 19V5C21 3.9 20.1 3 19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19ZM8.5 13.5L11 16.51L14.5 12L19 18H5L8.5 13.5Z" fill="#000" />
+                        </Svg>
+                        <Text style={[styles.headerOptionText, { marginLeft: 10 }]}>Upload from Photos or Gallery</Text>
+                    </TouchableOpacity>
+                </ModalSheet>
+
                 {/* Message action – modal sheet (Edit / Delete message on long-press) */}
                 <ModalSheet
                     visible={!!messageActionMessage}
@@ -1528,19 +1830,21 @@ const ChatRoom = () => {
                 {/* Chat List */}
                 {isLoading && messages.length === 0 ? (
                     <View style={{ flex: 1, justifyContent: 'center' }}>
-                        <ActivityIndicator size="large" color={COLORS.white} />
+                        <ActivityIndicator size="large" color={COLORS.primary} />
                     </View>
                 ) : (
                     <FlatList
                         ref={flatListRef}
-                        data={messages}
+                        data={[...messages].reverse()}
+                        inverted
                         keyExtractor={(item) => item.id}
                         renderItem={renderMessage}
                         contentContainerStyle={styles.chatListContent}
                         showsVerticalScrollIndicator={false}
-                        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
                         ListEmptyComponent={() => (
-                            <Text style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', marginTop: 40 }}>Send a message to start the conversation</Text>
+                            <View style={{ transform: [{ scaleY: -1 }] }}>
+                                <Text style={{ textAlign: 'center', color: '#9e9a9acc', marginTop: 40 }}>Send a message to start the conversation</Text>
+                            </View>
                         )}
                     />
                 )}
@@ -1565,14 +1869,55 @@ const ChatRoom = () => {
                                 </TouchableOpacity>
                             </View>
                         ) : null}
+                        {mentionKeyword !== null && filteredMentions.length > 0 && (
+                            <View style={styles.mentionsContainer}>
+                                <FlatList
+                                    keyboardShouldPersistTaps="always"
+                                    data={filteredMentions}
+                                    keyExtractor={(item) => item.id}
+                                    style={{ maxHeight: 150 }}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={styles.mentionItemRow}
+                                            onPress={() => handleSelectMention(item)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={styles.mentionAvatarContainer}>
+                                                {item.avatar ? (
+                                                    <Image source={{ uri: item.avatar }} style={styles.mentionAvatar} />
+                                                ) : (
+                                                    <View style={styles.mentionAvatarPlaceholder}>
+                                                        <Text style={styles.mentionAvatarText}>
+                                                            {(item.username || item.name || '?').charAt(0).toUpperCase()}
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                            <Text style={styles.mentionNameText}>{item.username || item.name}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            </View>
+                        )}
                         <View style={styles.inputContainer}>
                             <View style={styles.textInputWrapper}>
                                 {isRecording ? (
-                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginLeft: 10 }}>
-                                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: 'red', marginRight: 10 }} />
-                                        <Text style={{ fontFamily: FONT_BODY, fontSize: 15, color: 'red' }}>
-                                            Recording... {Math.floor(recordTime / 1000)}s
-                                        </Text>
+                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginLeft: 10, justifyContent: 'space-between' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Animated.View style={{ opacity: micPan.x.interpolate({ inputRange: [-100, 0], outputRange: [1, 0] }) }}>
+                                                <Trash size={20} color="red" variant="Bold" style={{ marginRight: 10 }} />
+                                            </Animated.View>
+                                            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: 'red', marginRight: 10 }} />
+                                            <Text style={{ fontFamily: FONT_BODY, fontSize: 15, color: '#1C1C1E' }}>
+                                                {formatDurationMs(recordTime)}
+                                            </Text>
+                                        </View>
+
+                                        <Animated.View style={{ opacity: micPan.x.interpolate({ inputRange: [-100, 0], outputRange: [0, 1] }), flexDirection: 'row', alignItems: 'center' }}>
+                                            <Text style={{ fontFamily: FONT_BODY, fontSize: 13, color: '#8E8E93', marginRight: 15 }}>
+                                                {"< Slide to cancel"}
+                                            </Text>
+                                        </Animated.View>
                                     </View>
                                 ) : (
                                     <TextInput
@@ -1581,19 +1926,34 @@ const ChatRoom = () => {
                                         placeholderTextColor="#8E8E93"
                                         value={message}
                                         onChangeText={handleMessageChange}
+                                        onSelectionChange={(e) => setCursorPosition(e.nativeEvent.selection.start)}
                                         onSubmitEditing={pendingAttachment ? handleSendPendingAttachment : handleSendMessage}
                                     />
                                 )}
                                 {uploading ? (
                                     <ActivityIndicator size="small" color="#1366D9" style={{ padding: 8 }} />
-                                ) : !isRecording && (
-                                    <TouchableOpacity style={styles.attachmentButton} activeOpacity={0.7} onPress={handlePickAttachment}>
-                                        <AttachmentIcon width={24} height={24} />
-                                    </TouchableOpacity>
+                                ) : (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        {!isRecording && (
+                                            <TouchableOpacity style={styles.attachmentButton} activeOpacity={0.7} onPress={handlePickAttachment}>
+                                                <AttachmentIcon width={24} height={24} />
+                                            </TouchableOpacity>
+                                        )}
+                                        <Animated.View
+                                            {...panResponder.panHandlers}
+                                            style={[styles.attachmentButton, { transform: [{ translateX: micPan.x }] }, isRecording && { backgroundColor: '#1366D9', borderRadius: 20, padding: 4 }]}
+                                        >
+                                            {isRecording ? (
+                                                <StopIcon width={24} height={24} color="#FFF" />
+                                            ) : (
+                                                <MicIcon width={24} height={24} color="#8E8E93" />
+                                            )}
+                                        </Animated.View>
+                                    </View>
                                 )}
                             </View>
 
-                            {!isRecording && (
+                            {!isRecording && (message.trim().length > 0 || pendingAttachment) && (
                                 <TouchableOpacity
                                     style={styles.iconButton}
                                     activeOpacity={0.8}
@@ -1602,18 +1962,6 @@ const ChatRoom = () => {
                                     <SendPaperplaneIcon width={24} height={24} />
                                 </TouchableOpacity>
                             )}
-
-                            <TouchableOpacity
-                                style={[styles.iconButton, isRecording && { backgroundColor: '#1366D9' }]}
-                                activeOpacity={0.8}
-                                onPress={isRecording ? handleStopRecording : handleStartRecording}
-                            >
-                                {isRecording ? (
-                                    <StopIcon width={24} height={24} />
-                                ) : (
-                                    <MicIcon width={24} height={24} />
-                                )}
-                            </TouchableOpacity>
                         </View>
                     </View>
                 ) : (
@@ -1635,14 +1983,55 @@ const ChatRoom = () => {
                                 </TouchableOpacity>
                             </View>
                         ) : null}
+                        {mentionKeyword !== null && filteredMentions.length > 0 && (
+                            <View style={styles.mentionsContainer}>
+                                <FlatList
+                                    keyboardShouldPersistTaps="always"
+                                    data={filteredMentions}
+                                    keyExtractor={(item) => item.id}
+                                    style={{ maxHeight: 150 }}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={styles.mentionItemRow}
+                                            onPress={() => handleSelectMention(item)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={styles.mentionAvatarContainer}>
+                                                {item.avatar ? (
+                                                    <Image source={{ uri: item.avatar }} style={styles.mentionAvatar} />
+                                                ) : (
+                                                    <View style={styles.mentionAvatarPlaceholder}>
+                                                        <Text style={styles.mentionAvatarText}>
+                                                            {(item.username || item.name || '?').charAt(0).toUpperCase()}
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                            <Text style={styles.mentionNameText}>{item.username || item.name}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            </View>
+                        )}
                         <View style={styles.inputContainer}>
                             <View style={styles.textInputWrapper}>
                                 {isRecording ? (
-                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginLeft: 10 }}>
-                                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: 'red', marginRight: 10 }} />
-                                        <Text style={{ fontFamily: FONT_BODY, fontSize: 15, color: 'red' }}>
-                                            Recording... {Math.floor(recordTime / 1000)}s
-                                        </Text>
+                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', marginLeft: 10, justifyContent: 'space-between' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Animated.View style={{ opacity: micPan.x.interpolate({ inputRange: [-100, 0], outputRange: [1, 0] }) }}>
+                                                <Trash size={20} color="red" variant="Bold" style={{ marginRight: 10 }} />
+                                            </Animated.View>
+                                            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: 'red', marginRight: 10 }} />
+                                            <Text style={{ fontFamily: FONT_BODY, fontSize: 15, color: '#1C1C1E' }}>
+                                                {formatDurationMs(recordTime)}
+                                            </Text>
+                                        </View>
+
+                                        <Animated.View style={{ opacity: micPan.x.interpolate({ inputRange: [-100, 0], outputRange: [0, 1] }), flexDirection: 'row', alignItems: 'center' }}>
+                                            <Text style={{ fontFamily: FONT_BODY, fontSize: 13, color: '#8E8E93', marginRight: 15 }}>
+                                                {"< Slide to cancel"}
+                                            </Text>
+                                        </Animated.View>
                                     </View>
                                 ) : (
                                     <TextInput
@@ -1651,19 +2040,34 @@ const ChatRoom = () => {
                                         placeholderTextColor="#8E8E93"
                                         value={message}
                                         onChangeText={handleMessageChange}
+                                        onSelectionChange={(e) => setCursorPosition(e.nativeEvent.selection.start)}
                                         onSubmitEditing={pendingAttachment ? handleSendPendingAttachment : handleSendMessage}
                                     />
                                 )}
                                 {uploading ? (
                                     <ActivityIndicator size="small" color="#1366D9" style={{ padding: 8 }} />
-                                ) : !isRecording && (
-                                    <TouchableOpacity style={styles.attachmentButton} activeOpacity={0.7} onPress={handlePickAttachment}>
-                                        <AttachmentIcon width={24} height={24} />
-                                    </TouchableOpacity>
+                                ) : (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        {!isRecording && (
+                                            <TouchableOpacity style={styles.attachmentButton} activeOpacity={0.7} onPress={handlePickAttachment}>
+                                                <AttachmentIcon width={24} height={24} />
+                                            </TouchableOpacity>
+                                        )}
+                                        <Animated.View
+                                            {...panResponder.panHandlers}
+                                            style={[styles.attachmentButton, { transform: [{ translateX: micPan.x }] }, isRecording && { backgroundColor: '#1366D9', borderRadius: 20, padding: 4 }]}
+                                        >
+                                            {isRecording ? (
+                                                <StopIcon width={24} height={24} color="#FFF" />
+                                            ) : (
+                                                <MicIcon width={24} height={24} color="#8E8E93" />
+                                            )}
+                                        </Animated.View>
+                                    </View>
                                 )}
                             </View>
 
-                            {!isRecording && (
+                            {!isRecording && (message.trim().length > 0 || pendingAttachment) && (
                                 <TouchableOpacity
                                     style={styles.iconButton}
                                     activeOpacity={0.8}
@@ -1672,18 +2076,6 @@ const ChatRoom = () => {
                                     <SendPaperplaneIcon width={24} height={24} />
                                 </TouchableOpacity>
                             )}
-
-                            <TouchableOpacity
-                                style={[styles.iconButton, isRecording && { backgroundColor: '#1366D9' }]}
-                                activeOpacity={0.8}
-                                onPress={isRecording ? handleStopRecording : handleStartRecording}
-                            >
-                                {isRecording ? (
-                                    <StopIcon width={24} height={24} />
-                                ) : (
-                                    <MicIcon width={24} height={24} />
-                                )}
-                            </TouchableOpacity>
                         </View>
                     </KeyboardAvoidingView>
                 )}
@@ -2012,7 +2404,7 @@ const styles = StyleSheet.create({
         maxWidth: '75%',
     },
     messageBubbleReceived: {
-        backgroundColor: '#508BE3',
+        backgroundColor: COLORS.white,
         borderTopLeftRadius: 0,
         borderTopRightRadius: 20,
         borderBottomRightRadius: 20,
@@ -2024,7 +2416,7 @@ const styles = StyleSheet.create({
         elevation: 0.5,
     },
     messageBubbleSent: {
-        backgroundColor: COLORS.white,
+        backgroundColor: COLORS.primary,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 0,
         borderBottomLeftRadius: 20,
@@ -2042,10 +2434,10 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
     messageTextReceived: {
-        color: COLORS.white,
+        color: '#1C1C1E',
     },
     messageTextSent: {
-        color: '#1366D9',
+        color: COLORS.white,
     },
     seeMoreTouchable: {
         alignSelf: 'flex-end',
@@ -2055,10 +2447,10 @@ const styles = StyleSheet.create({
         borderRadius: 6,
     },
     seeMoreTouchableSent: {
-        backgroundColor: 'rgba(19, 102, 217, 0.12)',
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
     },
     seeMoreTouchableReceived: {
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        backgroundColor: 'rgba(19, 102, 217, 0.12)',
     },
     seeMoreText: {
         fontFamily: FONT_BODY,
@@ -2102,14 +2494,55 @@ const styles = StyleSheet.create({
     },
     fileAttachmentTouchable: {
         alignSelf: 'flex-start',
-        paddingVertical: 4,
-        paddingRight: 4,
-        maxWidth: '100%',
     },
     fileAttachmentText: {
-        fontStyle: 'italic',
+        fontSize: 14,
         textDecorationLine: 'underline',
         flexShrink: 1,
+    },
+    mentionsContainer: {
+        backgroundColor: COLORS.white,
+        marginHorizontal: 16,
+        marginBottom: 8,
+        borderRadius: 12,
+        paddingVertical: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    mentionItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+    },
+    mentionAvatarContainer: {
+        marginRight: 12,
+    },
+    mentionAvatar: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+    },
+    mentionAvatarPlaceholder: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#1366D9',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    mentionAvatarText: {
+        color: COLORS.white,
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    mentionNameText: {
+        fontSize: 15,
+        color: '#1C1C1E',
+        fontFamily: FONT_BODY,
     },
     previewOverlay: {
         flex: 1,
@@ -2157,7 +2590,7 @@ const styles = StyleSheet.create({
         flex: 1,
         fontFamily: FONT_BODY,
         fontSize: 14,
-        color: COLORS.white,
+        color: COLORS.primary,
     },
     attachmentPreviewClose: {
         width: 28,

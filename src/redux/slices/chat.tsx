@@ -26,6 +26,7 @@ export interface ApiMessage {
     isRead?: boolean;
     /** Show "(edited)" label next to timestamp when true. */
     isEdited?: boolean;
+    mentions?: string[];
 }
 
 export interface ApiChat {
@@ -37,6 +38,7 @@ export interface ApiChat {
     lastMessage?: ApiMessage;
     unreadCount?: number;
     avatar?: string;
+    archivedAt?: string | null;
 }
 
 export interface ChatState {
@@ -66,7 +68,7 @@ export const fetchChatList = createAsyncThunk(
             const response = await request<any>({
                 url: ENDPOINTS.CHATS_LIST,
                 method: 'GET',
-                params: { workspaceId },
+                params: { workspaceId, includeArchived: true },
             });
             // Handle the nested items object if the API returns pagination/wrapper object
             const responseData = response?.data;
