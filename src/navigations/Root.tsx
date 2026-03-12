@@ -3,14 +3,14 @@ import MainStack from './MainStack';
 import AuthStack from './AuthStack';
 import { StyleSheet, View } from 'react-native';
 import { useAppSelector } from '../hooks';
+import { navigationRef, flushNavigationQueue } from './RemoteNavigation';
 
 const Root = () => {
   const token = useAppSelector((state) => state.auth.token);
-  console.log('token--->', token);
 
   return (
     <View style={[styles.container]}>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef} onReady={flushNavigationQueue}>
         {token ? <MainStack /> : <AuthStack />}
       </NavigationContainer>
     </View>

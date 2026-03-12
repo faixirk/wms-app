@@ -1,5 +1,6 @@
 import messaging from '@react-native-firebase/messaging';
 import { Platform } from 'react-native';
+import { localNotificationService } from '../notification/LocalNotificationService';
 
 /**
  * Requests notification permissions from the user. Returns the FCM token if granted.
@@ -55,7 +56,16 @@ export const getFcmToken = async (): Promise<string | null> => {
 export const listenToForegroundMessages = () => {
     return messaging().onMessage(async (remoteMessage) => {
         console.log('A new FCM message arrived in the foreground!', JSON.stringify(remoteMessage));
-        // Handle foreground message (e.g., show a local notification)
+
+        if (remoteMessage.notification) {
+            localNotificationService.showNotification(
+                remoteMessage.messageId || String(Date.now()),
+                remoteMessage.notification.title || 'New Message',
+                remoteMessage.notification.body || '',
+                remoteMessage.data,
+                {}
+            );
+        }
     });
 };
 
@@ -66,5 +76,23 @@ export const listenToForegroundMessages = () => {
 export const setupBackgroundMessageHandler = () => {
     messaging().setBackgroundMessageHandler(async (remoteMessage) => {
         console.log('Message handled in the background!', remoteMessage);
+
+        if (remoteMessage.notification) {
+            // The OS automatically displays FCM notification payloads when the app is in background or quit/kill state.
+            // Do NOT call localNotificationService.showNotification here, otherwise users will get duplicate notifications.
+            console.log('Background/Kill Mode notification received and automatically handled by the OS', remoteMessage.notification);
+        } else if (remoteMessage.data && (remoteMessage.data.title || remoteMessage.data.body)) {
+            // Check for data-only messages which are common in background
+            const title = typeof remoteMessage.data.title === 'string' ? remoteMessage.data.title : 'New Message';
+            const body = typeof remoteMessage.data.body === 'string' ? remoteMessage.data.body : '';
+
+            localNotificationService.showNotification(
+                remoteMessage.messageId || String(Date.now()),
+                title,
+                body,
+                remoteMessage.data,
+                {}
+            );
+        }
     });
 };

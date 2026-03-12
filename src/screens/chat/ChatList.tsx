@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, FlatList, Image, TouchableOpacity, A
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchIcon, SearchWhiteIcon, PlusWhiteIcon, ArrowLeftIcon } from '../../assets/svgs';
-import { Trash } from 'iconsax-react-native';
+import { Trash, ArchiveAdd, ArchiveMinus } from 'iconsax-react-native';
 import { emptyChatImg, newChatLogo, newGroupLogo } from '../../assets/images';
 import { COLORS } from '../../constants/colors';
 import { FONT_HEADING, FONT_BODY } from '../../constants/fonts';
@@ -51,6 +51,26 @@ function formatChatListDate(date: Date): string {
     return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
+/** Generate a consistent vibrant background color based on name string */
+export function getVibrantColor(name: string): string {
+    if (!name) return '#095CD7'; // Default primary
+    const vibrantColors = [
+        '#34B7F1', // Light Blue
+        '#FF453A', // Vibrant Red
+        '#FF9F0A', // Vibrant Orange
+        '#089d1eff', // Vibrant Green
+        '#BF5AF2', // Vibrant Purple
+        '#5E5CE6', // Indigo
+        '#FF375F', // Rose
+        '#64D2FF', // Cyan
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return vibrantColors[Math.abs(hash) % vibrantColors.length];
+}
+
 const ChatList = ({ navigation }: any) => {
     const dispatch = useAppDispatch();
     const { chats, loadingChats, onlineStatuses } = useAppSelector((state) => state.chat);
@@ -72,7 +92,7 @@ const ChatList = ({ navigation }: any) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchVisible, setSearchVisible] = useState(false);
     const [memberSearchQuery, setMemberSearchQuery] = useState('');
-    const [activeTab, setActiveTab] = useState<'All' | 'Group' | 'Archive'>('All');
+    const [activeTab, setActiveTab] = useState<'All' | 'Groups' | 'Archive'>('All');
 
     // Swipeable refs
     const rowRefs = useRef<Map<string, any>>(new Map());
@@ -298,24 +318,33 @@ const ChatList = ({ navigation }: any) => {
             if (rowRefs.current.has(item.id)) {
                 rowRefs.current.get(item.id)?.close();
             }
-            
+
             Alert.alert(
                 'Delete Chat',
                 'Are you sure you want to delete this chat?',
                 [
                     { text: 'Cancel', style: 'cancel' },
-                    { 
-                        text: 'Delete', 
+                    {
+                        text: 'Delete',
                         style: 'destructive',
                         onPress: async () => {
                             try {
                                 await request({
                                     url: ENDPOINTS.CHAT_DELETE(item.id),
-                                    method: 'DELETE'
+                                    method: 'POST',
+                                    data: { workspaceId: selectedWorkspaceId }
                                 });
                                 dispatch(removeChatFromList(item.id));
                             } catch (e: any) {
-                                Alert.alert('Error', e?.message || 'Failed to delete chat');
+                                let errorMsg = 'Failed to delete chat';
+                                if (e?.response?.data?.message?.message) {
+                                    errorMsg = e.response.data.message.message;
+                                } else if (e?.response?.data?.message) {
+                                    errorMsg = typeof e.response.data.message === 'string' ? e.response.data.message : errorMsg;
+                                } else if (e?.message) {
+                                    errorMsg = e.message;
+                                }
+                                Alert.alert('Error', errorMsg);
                             }
                         }
                     }
@@ -323,15 +352,49 @@ const ChatList = ({ navigation }: any) => {
             );
         };
 
+        const handleArchiveToggle = async () => {
+            if (rowRefs.current.has(item.id)) {
+                rowRefs.current.get(item.id)?.close();
+            }
+            try {
+                if (item.archivedAt) {
+                    await request({
+                        url: ENDPOINTS.CHAT_UNARCHIVE(item.id),
+                        method: 'POST',
+                        data: { workspaceId: selectedWorkspaceId },
+                    });
+                } else {
+                    await request({
+                        url: ENDPOINTS.CHAT_ARCHIVE(item.id),
+                        method: 'POST',
+                        data: { workspaceId: selectedWorkspaceId },
+                    });
+                }
+                dispatch(fetchChatList(selectedWorkspaceId as string));
+            } catch (e: any) {
+                Alert.alert('Error', e?.message || `Failed to ${item.archivedAt ? 'unarchive' : 'archive'} chat`);
+            }
+        };
+
         const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
             const trans = dragX.interpolate({
-                inputRange: [-80, 0],
-                outputRange: [0, 80],
+                inputRange: [-140, 0],
+                outputRange: [0, 140],
                 extrapolate: 'clamp',
             });
             return (
-                <View style={styles.rightActionContainer}>
-                    <Animated.View style={[styles.rightAction, { transform: [{ translateX: trans }] }]}>
+                <View style={[styles.rightActionContainer, { width: 140 }]}>
+                    <Animated.View style={[styles.rightAction, { transform: [{ translateX: trans }], flexDirection: 'row', width: 140, justifyContent: 'space-evenly' }]}>
+                        <TouchableOpacity
+                            style={[styles.deleteCircle, { backgroundColor: item.archivedAt ? COLORS.primary : '#8E8E93', opacity: item.archivedAt ? 0.8 : 1 }]}
+                            onPress={handleArchiveToggle}
+                        >
+                            {item.archivedAt ? (
+                                <ArchiveMinus size={24} color="#FFF" variant="Bold" />
+                            ) : (
+                                <ArchiveAdd size={24} color="#FFF" variant="Bold" />
+                            )}
+                        </TouchableOpacity>
                         <TouchableOpacity style={styles.deleteCircle} onPress={handleDeleteChat}>
                             <Trash size={24} color="#FFF" variant="Bold" />
                         </TouchableOpacity>
@@ -360,6 +423,7 @@ const ChatList = ({ navigation }: any) => {
 
         const showAvatarImage = !!chatAvatarUri;
         const avatarInitial = (chatName || '?').trim().charAt(0).toUpperCase() || '?';
+        const dynamicBgColor = getVibrantColor(chatName);
 
         let messagePreview: string = 'No messages yet';
         let datePreview = '';
@@ -412,62 +476,62 @@ const ChatList = ({ navigation }: any) => {
                 containerStyle={{ overflow: 'visible' }}
                 childrenContainerStyle={{ overflow: 'visible' }}
             >
-            <TouchableOpacity
-                style={styles.chatCard}
-                activeOpacity={0.7}
-                onPress={() => {
-                    // Force close if it is open so when user comes back it's not stuck open
-                    if (rowRefs.current.has(item.id)) {
-                        rowRefs.current.get(item.id)?.close();
-                    }
-                    navigation.navigate('ChatRoom', { chatId: item.id });
-                }}
-            >
-                <View style={styles.avatarContainer}>
-                    {showAvatarImage ? (
-                        <Image source={{ uri: chatAvatarUri }} style={styles.avatar} />
-                    ) : (
-                        <View style={styles.avatarPlaceholder}>
-                            <Text style={styles.avatarPlaceholderText}>{avatarInitial}</Text>
-                        </View>
-                    )}
-
-                    {!isGroup && (
-                        <View style={[styles.chatStatusDot, { backgroundColor: statusColor }]} />
-                    )}
-
-                    {hasAttachment && (
-                        <View style={styles.attachmentBadge}>
-                            <Text style={styles.attachmentText}>📎</Text>
-                        </View>
-                    )}
-                </View>
-                <View style={styles.chatContent}>
-                    <View style={styles.headerRow}>
-                        <Text style={styles.nameText} numberOfLines={1}>{chatName}</Text>
-                        <View style={styles.chatMetaRow}>
-                            {!!item.unreadCount && (
-                                <View style={styles.unreadBadge}>
-                                    <Text style={styles.unreadText}>{item.unreadCount}</Text>
-                                </View>
-                            )}
-                        </View>
-                    </View>
-                    <View style={styles.messageRow}>
-                        {typingChats[item.id] ? (
-                            <Text style={[styles.messageText, { color: '#4ADE80', fontStyle: 'italic' }]} numberOfLines={1} ellipsizeMode="tail">
-                                typing...
-                            </Text>
+                <TouchableOpacity
+                    style={styles.chatCard}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                        // Force close if it is open so when user comes back it's not stuck open
+                        if (rowRefs.current.has(item.id)) {
+                            rowRefs.current.get(item.id)?.close();
+                        }
+                        navigation.navigate('ChatRoom', { chatId: item.id });
+                    }}
+                >
+                    <View style={styles.avatarContainer}>
+                        {showAvatarImage ? (
+                            <Image source={{ uri: chatAvatarUri }} style={styles.avatar} />
                         ) : (
-                            <Text style={styles.messageText} numberOfLines={1} ellipsizeMode="tail">
-                                {messagePreview || 'No messages yet'}
-                            </Text>
+                            <View style={[styles.avatarPlaceholder, { backgroundColor: dynamicBgColor }]}>
+                                <Text style={styles.avatarPlaceholderText}>{avatarInitial}</Text>
+                            </View>
                         )}
-                        {datePreview && !typingChats[item.id] ? <Text style={styles.dateText}>{datePreview}</Text> : null}
-                    </View>
 
-                </View>
-            </TouchableOpacity>
+                        {!isGroup && (
+                            <View style={[styles.chatStatusDot, { backgroundColor: statusColor }]} />
+                        )}
+
+                        {hasAttachment && (
+                            <View style={styles.attachmentBadge}>
+                                <Text style={styles.attachmentText}>📎</Text>
+                            </View>
+                        )}
+                    </View>
+                    <View style={styles.chatContent}>
+                        <View style={styles.headerRow}>
+                            <Text style={styles.nameText} numberOfLines={1}>{chatName}</Text>
+                            <View style={styles.chatMetaRow}>
+                                {!!item.unreadCount && (
+                                    <View style={styles.unreadBadge}>
+                                        <Text style={styles.unreadText}>{item.unreadCount}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                        <View style={styles.messageRow}>
+                            {typingChats[item.id] ? (
+                                <Text style={[styles.messageText, { color: '#4ADE80', fontStyle: 'italic' }]} numberOfLines={1} ellipsizeMode="tail">
+                                    typing...
+                                </Text>
+                            ) : (
+                                <Text style={styles.messageText} numberOfLines={1} ellipsizeMode="tail">
+                                    {messagePreview || 'No messages yet'}
+                                </Text>
+                            )}
+                            {datePreview && !typingChats[item.id] ? <Text style={styles.dateText}>{datePreview}</Text> : null}
+                        </View>
+
+                    </View>
+                </TouchableOpacity>
             </Swipeable>
         );
     };
@@ -478,6 +542,7 @@ const ChatList = ({ navigation }: any) => {
         const memberAvatarUri = memberUser.avatar || item.avatar;
         const showMemberAvatar = !!memberAvatarUri;
         const memberInitial = (memberName || '?').trim().charAt(0).toUpperCase() || '?';
+        const dynamicBgColor = getVibrantColor(memberName);
 
         // Extract online status
         const otherUserId = item.userId || item.user?.id || item.id;
@@ -494,7 +559,7 @@ const ChatList = ({ navigation }: any) => {
                     {showMemberAvatar ? (
                         <Image source={{ uri: memberAvatarUri }} style={styles.memberAvatar} />
                     ) : (
-                        <View style={styles.memberAvatarPlaceholder}>
+                        <View style={[styles.memberAvatarPlaceholder, { backgroundColor: dynamicBgColor }]}>
                             <Text style={styles.memberAvatarPlaceholderText}>{memberInitial}</Text>
                         </View>
                     )}
@@ -512,6 +577,7 @@ const ChatList = ({ navigation }: any) => {
         const showMemberAvatar = !!memberAvatarUri;
         const memberInitial = (memberName || '?').trim().charAt(0).toUpperCase() || '?';
         const memberId = item.userId || item.user?.id || item.id;
+        const dynamicBgColor = getVibrantColor(memberName);
 
         const isOnline = onlineStatuses[memberId]?.status === 'online';
         const statusColor = isOnline ? '#4ADE80' : '#FDB52A';
@@ -527,7 +593,7 @@ const ChatList = ({ navigation }: any) => {
                     {showMemberAvatar ? (
                         <Image source={{ uri: memberAvatarUri }} style={styles.memberAvatar} />
                     ) : (
-                        <View style={styles.memberAvatarPlaceholder}>
+                        <View style={[styles.memberAvatarPlaceholder, { backgroundColor: dynamicBgColor }]}>
                             <Text style={styles.memberAvatarPlaceholderText}>{memberInitial}</Text>
                         </View>
                     )}
@@ -550,7 +616,7 @@ const ChatList = ({ navigation }: any) => {
 
     const filteredChats = chats.filter(chat => {
         if (activeTab === 'Archive' && !chat.archivedAt) return false;
-        if (activeTab === 'Group' && (chat.archivedAt || chat.type === 'DIRECT')) return false;
+        if (activeTab === 'Groups' && (chat.archivedAt || chat.type === 'DIRECT')) return false;
         if (activeTab === 'All' && chat.archivedAt) return false;
 
         const u = user as any;
@@ -609,7 +675,7 @@ const ChatList = ({ navigation }: any) => {
             <Text style={styles.chatsTitle}>CHATS</Text>
 
             <View style={styles.tabContainer}>
-                {(['All', 'Group', 'Archive'] as const).map(tab => (
+                {(['All', 'Groups', 'Archive'] as const).map(tab => (
                     <TouchableOpacity
                         key={tab}
                         style={[styles.filterTab, activeTab === tab && styles.filterTabActive]}
@@ -830,7 +896,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
+        paddingHorizontal: 10,
         paddingTop: 8,
         paddingBottom: 16,
     },
@@ -910,20 +976,21 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: '700',
         color: COLORS.text,
-        marginLeft: 20,
+        marginLeft: 15,
         marginTop: 20,
         marginBottom: 16,
         letterSpacing: 0.5,
     },
     tabContainer: {
         flexDirection: 'row',
-        paddingHorizontal: 20,
+        paddingHorizontal: 10,
         marginBottom: 16,
-        gap: 12,
+        marginLeft: 5,
+        gap: 8,
     },
     filterTab: {
-        paddingVertical: 6,
-        paddingHorizontal: 16,
+        paddingVertical: 4,
+        paddingHorizontal: 10,
         borderRadius: 20,
         backgroundColor: COLORS.white,
         borderWidth: 1,
@@ -944,14 +1011,14 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
-        paddingHorizontal: 20,
+        paddingHorizontal: 10,
     },
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.white,
-        borderRadius: 18,
-        paddingHorizontal: 20,
+        borderRadius: 30,
+        paddingHorizontal: 10,
         height: 50,
         marginBottom: 16,
         shadowColor: '#000',
@@ -988,9 +1055,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: COLORS.white,
         borderRadius: 16,
-        paddingVertical: 14,
+        paddingVertical: 10,
         paddingHorizontal: 10,
-        marginBottom: 8,
+        marginBottom: 10,
         marginHorizontal: 4,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -1266,7 +1333,7 @@ const styles = StyleSheet.create({
     },
     optionButton: {
         paddingVertical: 16,
-        paddingHorizontal: 20,
+        paddingHorizontal: 10,
         backgroundColor: '#EEEEEE',
         borderRadius: 12,
         marginBottom: 12,

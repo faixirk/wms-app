@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     View, Text, StyleSheet, ImageBackground, Image, TouchableOpacity, TextInput,
-    FlatList, KeyboardAvoidingView, Keyboard, Platform, ActivityIndicator, Alert, PermissionsAndroid,
+    FlatList, KeyboardAvoidingView, Keyboard, Platform, ActivityIndicator, Alert, PermissionsAndroid, DeviceEventEmitter,
     Modal, Linking, Dimensions, Animated, ScrollView, PanResponder
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -13,7 +13,7 @@ import { COLORS } from '../../constants/colors';
 import { FONT_HEADING, FONT_BODY } from '../../constants/fonts';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { fetchChatList, fetchChatMessages, ApiMessage, addMessageToRoom, updateMessageInRoom, removeChatFromList } from '../../redux/slices/chat';
+import { fetchChatList, fetchChatMessages, ApiMessage, addMessageToRoom, updateMessageInRoom, removeChatFromList, clearChatUnreadCount } from '../../redux/slices/chat';
 import { socketService } from '../../services/network/socket';
 import { uploadFile } from '../../services/network/upload';
 import { useSound } from 'react-native-nitro-sound';
@@ -111,26 +111,30 @@ const AudioMessagePlayer = ({ url, isSent, duration: initialDuration = 0, messag
         }).start();
     }, [progress, progressAnim]);
 
+    useEffect(() => {
+        const subscription = DeviceEventEmitter.addListener('AUDIO_STARTED', async (playingUrl: string) => {
+            if (playingUrl !== url && state.isPlaying) {
+                await pausePlayer();
+            }
+        });
+        return () => subscription.remove();
+    }, [url, state.isPlaying, pausePlayer]);
+
     const playPause = async () => {
         try {
             if (state.isPlaying) {
                 await pausePlayer();
             } else {
-                // if (isUnsupportedAudioFormatOnIOS(url)) {
-                //     Alert.alert(
-                //         'Format not supported',
-                //         'WebM audio cannot be played on this device. Ask the sender to send the message in a different format (e.g. from the mobile app).'
-                //     );
-                //     return;
-                // }
                 if (state.currentPosition === 0 || playbackPosition >= playbackDuration) {
                     currentPlayingAudioUrl = url;
+                    DeviceEventEmitter.emit('AUDIO_STARTED', url);
                     setPlaybackPosition(0);
                     playbackEventCountRef.current = 0;
                     await startPlayer(url);
                     await setPlaybackSpeed(speed);
                 } else {
                     currentPlayingAudioUrl = url;
+                    DeviceEventEmitter.emit('AUDIO_STARTED', url);
                     await resumePlayer();
                 }
             }
@@ -234,6 +238,7 @@ const ChatRoom = () => {
 
     const [message, setMessage] = useState('');
     const [uploading, setUploading] = useState(false);
+    const [downloadingAttachments, setDownloadingAttachments] = useState<{ [messageId: string]: boolean }>({});
     const [isRecording, setIsRecording] = useState(false);
     const [recordTime, setRecordTime] = useState(0);
     const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
@@ -400,9 +405,9 @@ const ChatRoom = () => {
 
     useEffect(() => {
         if (!isGroup) {
-            setInfoActiveTab('Files');
+            setInfoActiveTab(prev => prev === 'Members' ? 'Files' : prev);
         }
-    }, [isGroup, infoActiveTab]);
+    }, [isGroup]);
 
     useEffect(() => {
         if (!isGroup) {
@@ -452,15 +457,25 @@ const ChatRoom = () => {
         return currentChat?.participants?.find((p: any) => p.id !== userId) || currentChat?.participants?.[0];
     }, [isGroup, currentChat, userId]);
 
+    const notificationData = route.params?.notificationData;
+
     // Set Header Name
-    const headerNameFull = isGroup
-        ? (currentChat?.name || currentChat?.title || 'Group Chat')
-        : (otherParticipant?.username || otherParticipant?.name || currentChat?.title || currentChat?.name || 'Chat');
+    let headerNameFull = 'Chat';
+    if (isGroup) {
+        headerNameFull = currentChat?.name || currentChat?.title || notificationData?.chatName || 'Group Chat';
+    } else {
+        headerNameFull = otherParticipant?.username || otherParticipant?.name || currentChat?.title || currentChat?.name || notificationData?.senderUsername || 'Chat';
+    }
 
     const headerName = isGroup ? headerNameFull : ((headerNameFull || '').trim().split(/\s+/)[0] || headerNameFull);
 
     // Set Header Avatar
-    const headerAvatarUri = isGroup ? currentChat?.avatar : (currentChat?.avatar || otherParticipant?.avatar);
+    let headerAvatarUri: string | undefined = undefined;
+    if (isGroup) {
+        headerAvatarUri = currentChat?.avatar; // Group notification payload usually doesn't send the group avatar
+    } else {
+        headerAvatarUri = currentChat?.avatar || otherParticipant?.avatar || notificationData?.senderAvatar;
+    }
     const showHeaderAvatarImage = !!headerAvatarUri;
     const headerAvatarInitial = (headerName || '?').trim().charAt(0).toUpperCase() || '?';
 
@@ -615,6 +630,7 @@ const ChatRoom = () => {
                 chatId,
                 workspaceId: selectedWorkspaceId
             });
+            dispatch(clearChatUnreadCount(chatId));
         };
 
         // Trigger read when joining
@@ -832,6 +848,26 @@ const ChatRoom = () => {
         }
     };
 
+    const handleUnarchiveChat = async () => {
+        if (!chatId || !selectedWorkspaceId || chatActionLoading) return;
+        setChatActionLoading(true);
+        setHeaderOptionsVisible(false);
+        try {
+            await request({
+                method: 'POST',
+                url: ENDPOINTS.CHAT_UNARCHIVE(chatId),
+                data: { workspaceId: selectedWorkspaceId },
+            });
+            dispatch(fetchChatList(selectedWorkspaceId));
+            navigation.goBack();
+        } catch (e: any) {
+            const msg = e?.response?.data?.message || e?.message || 'Failed to unarchive chat';
+            Alert.alert('Error', msg);
+        } finally {
+            setChatActionLoading(false);
+        }
+    };
+
     const handleDeleteChat = () => {
         setHeaderOptionsVisible(false);
         Alert.alert(
@@ -855,7 +891,14 @@ const ChatRoom = () => {
                             dispatch(fetchChatList(selectedWorkspaceId));
                             navigation.goBack();
                         } catch (e: any) {
-                            const msg = e?.response?.data?.message || e?.message || 'Failed to delete chat';
+                            let msg = 'Failed to delete chat';
+                            if (e?.response?.data?.message?.message) {
+                                msg = e.response.data.message.message;
+                            } else if (e?.response?.data?.message) {
+                                msg = typeof e.response.data.message === 'string' ? e.response.data.message : msg;
+                            } else if (e?.message) {
+                                msg = e.message;
+                            }
                             Alert.alert('Error', msg);
                         } finally {
                             setChatActionLoading(false);
@@ -991,6 +1034,64 @@ const ChatRoom = () => {
         }
     };
 
+    const handleDownloadAttachment = async () => {
+        if (!messageActionMessage || !messageActionMessage.attachments || messageActionMessage.attachments.length === 0) return;
+
+        const attachment = messageActionMessage.attachments[0];
+        if (!attachment.url) return;
+
+        const messageId = messageActionMessage.id;
+        setMessageActionMessage(null);
+        setDownloadingAttachments(prev => ({ ...prev, [messageId]: true }));
+
+        const { config, fs } = ReactNativeBlobUtil;
+        const RootDir = Platform.OS === 'ios' ? fs.dirs.DocumentDir : fs.dirs.DownloadDir;
+        const fileName = attachment.name || `download_${Date.now()}`;
+        const ext = attachment.mimeType ? attachment.mimeType.split('/')[1] : 'file';
+
+        let filePath = `${RootDir}/${fileName}`;
+        // Add extension if missing
+        if (!filePath.includes('.')) {
+            filePath = `${filePath}.${ext}`;
+        }
+
+        const options = Platform.select({
+            ios: {
+                fileCache: true,
+                path: filePath,
+            },
+            android: {
+                fileCache: true,
+                addAndroidDownloads: {
+                    useDownloadManager: true,
+                    notification: true,
+                    path: filePath,
+                    description: 'Downloading file.',
+                },
+            },
+        });
+
+        try {
+            const res = await config(options || {}).fetch('GET', attachment.url);
+            setDownloadingAttachments(prev => ({ ...prev, [messageId]: false }));
+
+            if (Platform.OS === 'ios') {
+                setTimeout(() => {
+                    ReactNativeBlobUtil.ios.presentOpenInMenu(res.path());
+                }, 100);
+                setTimeout(() => {
+                    Alert.alert('Success', 'File downloaded successfully.');
+                }, 1000);
+            } else {
+                Alert.alert('Success', 'File downloaded successfully.');
+            }
+        } catch (error) {
+            console.error('Download error:', error);
+            setDownloadingAttachments(prev => ({ ...prev, [messageId]: false }));
+            Alert.alert('Download Failed', 'There was an issue downloading the file.');
+        }
+    };
+
     const handleOpenAttachment = (att: { url: string; mimeType?: string; name?: string }) => {
         if (!att?.url) return;
         const mime = (att.mimeType || '').toLowerCase();
@@ -1038,12 +1139,14 @@ const ChatRoom = () => {
 
         const isDeleted = !!item.deletedAt;
         const isOwnMessage = (item.sender?.id || item.senderId) === userId;
+        const isDownloading = !!downloadingAttachments[item.id];
+        const hasOptions = isOwnMessage || hasAttachment;
 
         return (
             <TouchableOpacity
                 style={[styles.messageRow, isSent ? styles.messageRowRight : styles.messageRowLeft]}
                 activeOpacity={1}
-                onLongPress={isOwnMessage && !isDeleted ? () => setMessageActionMessage(item) : undefined}
+                onLongPress={(!isDeleted && hasOptions) ? () => setMessageActionMessage(item) : undefined}
             >
                 {!isSent && (
                     senderAvatar ? (
@@ -1069,6 +1172,11 @@ const ChatRoom = () => {
                         mainAttachment.mimeType?.includes('image') ? (
                             <TouchableOpacity activeOpacity={0.9} onPress={() => handleOpenAttachment(mainAttachment)}>
                                 <Image source={{ uri: mainAttachment.url }} style={{ width: 150, height: 150, borderRadius: 8, marginBottom: 4 }} resizeMode="cover" />
+                                {isDownloading && (
+                                    <View style={{ position: 'absolute', top: 0, left: 0, width: 150, height: 150, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', borderRadius: 8 }}>
+                                        <ActivityIndicator size="small" color="#FFF" />
+                                    </View>
+                                )}
                             </TouchableOpacity>
                         ) : mainAttachment.mimeType?.includes('audio') ? (
                             <AudioMessagePlayer
@@ -1077,15 +1185,33 @@ const ChatRoom = () => {
                                 duration={mainAttachment.duration}
                                 messageId={item.id}
                             />
+                        ) : mainAttachment.mimeType?.includes('video') ? (
+                            <TouchableOpacity
+                                activeOpacity={0.8}
+                                onPress={() => handleOpenAttachment(mainAttachment)}
+                                style={{ width: 220, height: 160, borderRadius: 12, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}
+                            >
+                                <ChatVideoCamIcon width={48} height={48} color="#FFF" />
+                                {isDownloading && (
+                                    <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', borderRadius: 12 }}>
+                                        <ActivityIndicator size="small" color="#FFF" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
                         ) : (
                             <TouchableOpacity
                                 activeOpacity={0.7}
                                 onPress={() => handleOpenAttachment(mainAttachment)}
-                                style={styles.fileAttachmentTouchable}
+                                style={[styles.fileAttachmentTouchable, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minWidth: isDownloading ? 100 : 'auto' }]}
                             >
-                                <Text style={[styles.messageText, isSent ? styles.messageTextSent : styles.messageTextReceived, styles.fileAttachmentText]}>
+                                <Text style={[styles.messageText, isSent ? styles.messageTextSent : styles.messageTextReceived, styles.fileAttachmentText, { flexShrink: 1 }]}>
                                     {mainAttachment.name || 'Attached File'}
                                 </Text>
+                                {isDownloading && (
+                                    <View style={{ marginLeft: 8, justifyContent: 'center', alignItems: 'center' }}>
+                                        <ActivityIndicator size="small" color={isSent ? '#FFF' : COLORS.primary} />
+                                    </View>
+                                )}
                             </TouchableOpacity>
                         )
                     ) : null}
@@ -1674,17 +1800,19 @@ const ChatRoom = () => {
                 <ModalSheet
                     visible={headerOptionsVisible}
                     onClose={() => setHeaderOptionsVisible(false)}
-                    heightFraction={0.24}
+                    autoHeight
                     dismissOnOverlayPress={!chatActionLoading}
                 >
                     <Text style={styles.reportSheetTitle}>Chat options</Text>
                     <TouchableOpacity
                         style={styles.headerOptionSheetItem}
-                        onPress={handleArchiveChat}
+                        onPress={currentChat?.archivedAt ? handleUnarchiveChat : handleArchiveChat}
                         disabled={chatActionLoading}
                         activeOpacity={0.7}
                     >
-                        <Text style={styles.headerOptionText}>Archive chat</Text>
+                        <Text style={styles.headerOptionText}>
+                            {currentChat?.archivedAt ? 'Unarchive chat' : 'Archive chat'}
+                        </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.headerOptionSheetItem, styles.headerOptionSheetItemDanger]}
@@ -1700,7 +1828,7 @@ const ChatRoom = () => {
                 <ModalSheet
                     visible={attachmentOptionsVisible}
                     onClose={() => setAttachmentOptionsVisible(false)}
-                    heightFraction={0.24}
+                    autoHeight
                     dismissOnOverlayPress={true}
                 >
                     <Text style={styles.reportSheetTitle}>Select Attachment</Text>
@@ -1728,7 +1856,7 @@ const ChatRoom = () => {
                 <ModalSheet
                     visible={!!messageActionMessage}
                     onClose={() => setMessageActionMessage(null)}
-                    heightFraction={0.24}
+                    autoHeight
                     dismissOnOverlayPress={!messageActionLoading}
                 >
                     <Text style={styles.reportSheetTitle}>Message options</Text>
@@ -1740,6 +1868,16 @@ const ChatRoom = () => {
                             activeOpacity={0.7}
                         >
                             <Text style={styles.headerOptionText}>Edit message</Text>
+                        </TouchableOpacity>
+                    )}
+                    {messageActionMessage && messageActionMessage.attachments && messageActionMessage.attachments.length > 0 && (
+                        <TouchableOpacity
+                            style={styles.headerOptionSheetItem}
+                            onPress={handleDownloadAttachment}
+                            disabled={messageActionLoading}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={styles.headerOptionText}>Download attachment</Text>
                         </TouchableOpacity>
                     )}
                     {messageActionMessage && (messageActionMessage.sender?.id || messageActionMessage.senderId) === userId && (
@@ -1836,6 +1974,7 @@ const ChatRoom = () => {
                     <FlatList
                         ref={flatListRef}
                         data={[...messages].reverse()}
+                        extraData={downloadingAttachments}
                         inverted
                         keyExtractor={(item) => item.id}
                         renderItem={renderMessage}
@@ -2366,7 +2505,7 @@ const styles = StyleSheet.create({
     },
     messageRow: {
         flexDirection: 'row',
-        alignItems: 'flex-end',
+        alignItems: 'flex-start',
         marginBottom: 8,
     },
     messageRowLeft: {

@@ -59,6 +59,13 @@ class LocalNotificationService {
     };
 
     showNotification = (id: string, title: string, message: string, data = {}, options = {}) => {
+        // Ensure ID is a valid 32-bit integer (Android max depends on Integer.parseInt)
+        let parsedId = parseInt(id, 10);
+        if (isNaN(parsedId) || parsedId > 2147483647 || parsedId < -2147483648) {
+            // Fallback to random 32-bit integer if id is non-numeric string like UUID or too large (e.g. Date.now())
+            parsedId = Math.floor(Math.random() * 2147483647);
+        }
+
         PushNotification.localNotification({
             /* Android Only Properties */
             autoCancel: true,
@@ -71,7 +78,7 @@ class LocalNotificationService {
             channelId: "default-channel-id",
 
             /* iOS and Android properties */
-            id: parseInt(id) || 0,
+            id: Platform.OS === 'android' ? parsedId.toString() : parsedId, // Android expects string, iOS prefers number/string
             title: title,
             message: message,
             playSound: true,

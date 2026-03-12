@@ -25,6 +25,8 @@ export interface ModalSheetProps {
   /** Height as fraction of screen (0–1). Default 0.7 = ~70% */
   heightFraction?: number;
   customSheetInner?: StyleProp<ViewStyle>;
+  /** If true, adapts to its content height rather than forcing heightFraction */
+  autoHeight?: boolean;
 }
 
 const HEADER_STRIP_HEIGHT = 48;
@@ -38,9 +40,10 @@ const ModalSheet = ({
   dismissOnOverlayPress = true,
   heightFraction = 0.7,
   customSheetInner,
+  autoHeight = false,
 }: ModalSheetProps) => {
   const { height: windowHeight } = useWindowDimensions();
-  const sheetHeight = windowHeight * heightFraction;
+  const sheetHeight = autoHeight ? windowHeight : windowHeight * heightFraction;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(sheetHeight)).current;
   const keyboardOffset = useRef(new Animated.Value(0)).current;
@@ -132,7 +135,7 @@ const ModalSheet = ({
           style={[
             styles.sheet,
             {
-              height: sheetHeight,
+              height: autoHeight ? undefined : sheetHeight,
               transform: [{ translateY: sheetTranslateY }],
             },
             contentStyle,
@@ -141,7 +144,7 @@ const ModalSheet = ({
           {header ? (
             <View style={styles.headerStrip}>{header}</View>
           ) : null}
-          <Pressable style={[styles.sheetInner, customSheetInner]} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={[styles.sheetInner, autoHeight && { flex: undefined }, customSheetInner]} onPress={(e) => e.stopPropagation()}>
             {children}
           </Pressable>
         </Animated.View>

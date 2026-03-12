@@ -162,6 +162,12 @@ const chatSlice = createSlice({
             state.chats = state.chats.filter(c => c.id !== action.payload);
             delete state.activeRoomMessages[action.payload];
         },
+        clearChatUnreadCount: (state, action: PayloadAction<string>) => {
+            const chatIndex = state.chats.findIndex(c => c.id === action.payload);
+            if (chatIndex >= 0) {
+                state.chats[chatIndex].unreadCount = 0;
+            }
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -207,6 +213,7 @@ export const {
     updateChatInList,
     updateMessageInRoom,
     removeChatFromList,
+    clearChatUnreadCount,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;
